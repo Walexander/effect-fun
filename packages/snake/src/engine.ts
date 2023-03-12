@@ -8,11 +8,11 @@ type Chunk<A> = Chunk.Chunk<A>
 
 export interface Engine<Event> {
   publish(event: Event|BuiltinEvents): IO.Effect<never, never, void>
-  renderLoop<A>(
-    initialize: IO.Effect<never, never, A>,
+  renderLoop<A, R1, R2>(
+    initialize: IO.Effect<R1, never, A>,
     eventHandler: (v: A, events: Chunk<Event|BuiltinEvents>) => IO.Effect<never, never, A>,
-    render: (model: A) => IO.Effect<never, never, void>
-  ): IO.Effect<never, never, void>
+    render: (model: A) => IO.Effect<R2, never, void>
+  ): IO.Effect<R1 | R2, never, void>
 }
 export interface GameTick {
   _tag: 'tick'
@@ -40,11 +40,11 @@ class EngineLive<E> implements Engine<E> {
     return this.eventQueue.offer(event);
   }
 
-  renderLoop<A>(
-    initialize: IO.Effect<never, never, A>,
-    eventHandler: (v: A, events: Chunk.Chunk<E|BuiltinEvents>) => IO.Effect<never, never, A>,
-    render: (model: A) => IO.Effect<never, never, void>
-  ): IO.Effect<never, never, void> {
+  renderLoop<A, R1, R2>(
+    initialize: IO.Effect<R1, never, A>,
+    eventHandler: (v: A, event: Chunk.Chunk<E|BuiltinEvents>) => IO.Effect<never, never, A>,
+    render: (model: A) => IO.Effect<R2, never, void>
+  ): IO.Effect<R1 | R2, never, void> {
     return pipe(
       S.fromEffect(initialize),
       S.flatMap((initial) =>

@@ -1,4 +1,5 @@
 import * as IO from '@effect/io/Effect'
+import { Rect, rect } from 'graphics-ts/Shape'
 import { pipe } from '@effect/data/Function'
 import {
   BuiltinEvents,
@@ -11,78 +12,97 @@ import {
 import * as C from 'graphics-ts/Canvas'
 import { NonEmptyArray } from '@effect/data/ReadonlyArray'
 import * as RA from '@effect/data/ReadonlyArray'
-import { Chunk } from '@effect/data/Chunk'
+import * as Chunk from '@effect/data/Chunk'
+type Chunk<A> = Chunk.Chunk<A>
 interface Model {
   readonly snake: NonEmptyArray<readonly [number, number]>
   readonly apple: readonly [number, number]
   readonly velocity: [number, number]
+  readonly scale: number
+  readonly dims: [number, number]
+  readonly background: ImageData
+  bounds: Rect
+  publish: (event: GameEvent) => IO.Effect<never, never, void>
 }
 export function main() {
-  return IO.runPromise(pipe(program, IO.catchAllCause(IO.logErrorCause)))
+  return IO.runPromise(
+    pipe(
+      program,
+      C.renderTo('canvas'),
+      IO.catchAllCause(IO.logErrorCause)
+    )
+  )
 }
-
 interface AppleEat {
   _tag: 'eats'
 }
+
 type GameEvent = BuiltinEvents | AppleEat
 const Engine = EngineTag<GameEvent>()
 
-const initialize: IO.Effect<never, never, Model> = IO.all({
-  snake: IO.succeed(<NonEmptyArray<[number, number]>>[[0, 0]]),
-  apple: makeApple(-10, 10),
-  velocity: IO.succeed<[number, number]>([0, 0]),
-})
+function initialize (engine: Engine<GameEvent>): IO.Effect<CanvasRenderingContext2D, never, Model> {
+  return pipe(
+    C.dimensions,
+    IO.flatMap(({width}) =>
+      IO.all({
+        snake: IO.succeed(<NonEmptyArray<[number, number]>>[[0, 0]]),
+        apple: makeApple(-10, 10),
+        dims: IO.map(C.dimensions, ({width, height}) => <[number, number]>[width, height]),
+        scale: IO.succeed(width / 25),
+        velocity: IO.succeed<[number, number]>([0, 0]),
+        publish: IO.succeed(engine.publish.bind(engine)),
+        bounds: IO.succeed(rect(-width / 50, -width / 50, width / 50, width / 50)),
+        background: whiteBackground(width, width)
+      })
+    )
+  )
+}
 const program = pipe(
   IO.serviceWithEffect(Engine, engine =>
-    engine.renderLoop<Model>(initialize, updateGameState(engine), drawGame)
+    engine.renderLoop(initialize(engine), updateGameState, drawGame())
   ),
   IO.provideSomeLayer(engineLive(Engine))
 )
 
-function updateGameState(engine: Engine<GameEvent>) {
-  return (state: Model, events: Chunk<GameEvent>) =>
-    IO.reduce(events, state, (model, event) =>
-      IO.tap(eventReducer(model, event, engine.publish.bind(engine)), _ =>
-        event._tag != 'tick'
-          ? IO.log(`Got event: ${event._tag} -- ${JSON.stringify(_)}`)
-          : IO.unit()
-      )
-    )
+function updateGameState(state: Model, events: Chunk<GameEvent>) {
+  return IO.reduce(
+    events,
+    state,
+    (model, event) => eventReducer(model, event)
+  )
 }
-const scaleX = 2
-const scaleY = 2
-function drawGame(state: Model) {
-  return pipe(
-    IO.unit(),
-    IO.zipRight(C.withContext(
-      IO.collectAll([
-        C.translate(50, 50),
-        C.scale(scaleX, scaleY),
-        C.clearRect(-50, -50, 100, 100),
-        drawSnake(state.snake),
-        drawApple(state.apple),
-      ])
+
+function drawGame()  {
+  return (state: Model) => pipe(
+    C.setFillStyle('black'),
+    IO.zipRight(C.putImageData(state.background, 0, 0)),
+    IO.zipRight(pipe(
+      C.translate(state.dims[0] / 2,state.dims[1]  / 2),
+      IO.zipRight(C.withContext(
+        IO.collectAll([
+          C.translate(state.dims[0] / -2.25, state.dims[1] / -2.75),
+          C.scale(state.scale / 6, state.scale / 6),
+          drawDebug(state)
+        ])
+      )),
+      IO.zipRight(
+        IO.collectAll([
+          drawSnake(state),
+          drawApple(state),
+        ])
+      ),
+      C.withContext
     )),
-    IO.zipRight(C.withContext(
-      IO.collectAll([
-        C.translate(20, 30),
-        drawDebug(state)
-      ])
-    )),
-    C.renderTo('canvas'),
-    IO.orDie,
     IO.as(void null)
   )
 }
-type PublishFn = (g: AppleEat) => IO.Effect<never, never, void>
 function eventReducer(
   state: Model,
   e: GameEvent,
-  publish: PublishFn
 ): IO.Effect<never, never, Model> {
   switch (e._tag) {
     case 'tick':
-      return onTick(e, state, publish)
+      return onTick(e, state)
 
     case 'keydown':
       return onKeyDown(e, state)
@@ -104,24 +124,49 @@ function eventReducer(
   }
 }
 
-function onKeyDown(event: KeyDown, state: Model) {
-  return pipe(velocityFromKey(event.code, state.velocity), velocity =>
-    IO.succeed({
+function onKeyDown(event: KeyDown, {velocity, snake: [head, ...tail], ...state}: Model) {
+  return pipe(
+    velocityFromKey(event.code, velocity),
+    _velocity => (<Model>{
       ...state,
-      velocity,
-    })
+      snake: [head, ...tail],
+      velocity: whiplash([head[0] + _velocity[0], head[1] + _velocity[1]], tail) ? velocity : _velocity,
+    }),
+    IO.succeed,
   )
 }
 
-function onTick(e: GameTick, state: Model, publish: PublishFn) {
+function whiplash(next: [number, number], [neck = [Infinity, Infinity]]: (readonly [number, number])[]): boolean {
+  return next[0] != 0 && next[1] != 0 && next[0] == neck[0] && next[1] == neck[1]
+}
+
+function onTick(e: GameTick, state: Model) {
   return pipe(
     applyVelocity(state, e.tick),
     IO.succeed,
     IO.tap(({ snake: [head], apple }) =>
       head[0] == apple[0] && head[1] == apple[1]
-        ? publish({ _tag: 'eats' })
+        ? state.publish({ _tag: 'eats' })
         : IO.unit()
+    ),
+    IO.map<Model, Model>(state =>
+      checkCollision(state)
+        ? {
+            ...state,
+            velocity: [0, 0],
+          }
+        : state
     )
+  )
+}
+
+
+function checkCollision(model: Model) {
+  const [head, ,...tail]  = model.snake
+  return (
+    (tail.length > 1 && tail.some(([x, y]) => x == head[0] && y == head[1])) ||
+    Math.abs(head[0]) >= model.bounds.width ||
+    Math.abs(head[1]) >= model.bounds.height
   )
 }
 
@@ -137,7 +182,7 @@ function makeApple(
 function applyVelocity(state: Model, tick: number): Model {
   const [[x, y]] = state.snake
   const [dx, dy] = state.velocity
-  return tick % 10 != 0
+  return tick % 4 != 0 || (dx == 0 && dy == 0)
     ? state
     : {
         ...state,
@@ -162,53 +207,152 @@ function velocityFromKey(
       return [x, y]
   }
 }
+function gridLine ([fromX, fromY]: [number, number], [toX, toY]: [number, number])  {
+  return C.withContext(IO.collectAllDiscard([
+    C.scale(25, 25),
+    C.moveTo(fromX, fromY),
+    C.lineTo(toX, toY),
+  ]))
+}
+const wallThickness = 25
+const whiteBackground = (width: number, height: number) => pipe(
+  IO.collectAllDiscard([
+    C.clearRect(0, 0, width, height),
+    C.setFillStyle('lightgrey'),
+    C.fillPath(C.rect(0, 0,width, height)),
+    C.setFillStyle('red'),
+    C.fillPath(C.rect(0, 0, wallThickness, height)),
+    C.fillPath(C.rect(0, 0, width, wallThickness)),
+    C.fillPath(C.rect(width - wallThickness, 0, wallThickness, height)),
+    C.fillPath(C.rect(0, height - wallThickness, width, wallThickness)),
+    C.fillPath(C.rect(0, 0, 0, 0)),
+  ]),
+  C.withContext,
+  IO.zipRight(C.getImageData(0, 0, width, height)),
+)
+const gridBackground = (width: number, height: number) => pipe(
+  IO.collectAllDiscard([
+    C.clearRect(0, 0, width, height),
+    C.setStrokeStyle('lightgrey'),
+    C.beginPath,
+    strokeLines(width, 'x'),
+    strokeLines(height, 'y'),
+    C.closePath,
+    C.fillPath(C.rect(0, 0, wallThickness, height)),
+    C.fillPath(C.rect(0, 0, width, wallThickness)),
+    C.fillPath(C.rect(width - wallThickness, 0, wallThickness, height)),
+    C.fillPath(C.rect(0, height - wallThickness, width, wallThickness)),
+    C.fillPath(C.rect(0, 0, 0, 0)),
+  ]),
+  C.withContext,
+  IO.zipRight(C.getImageData(0, 0, width, height)),
+)
+void gridBackground
+
+function strokeLines(size: number, direction: 'x'|'y') {
+  return C.strokePath(IO.forEachDiscard(
+    RA.range(0, size / 20)
+    , start =>
+        pipe(
+          (gridLine(...<[[number, number], [number, number]]>(
+            direction == 'x'
+              ? [ [start , 0], [start, size] ]
+              : [ [0, start], [size, start] ]
+          ))
+          )
+        )
+      ))
+}
 
 
-function drawSnake(snake: Model['snake']) {
+
+
+function drawSnake({snake, velocity: [dx, dy], scale}: Model) {
   const Canvas = C
   const [head, ...tail] = snake
-  const drawTail = C.withContext(
-    IO.collectAllDiscard([
-      Canvas.setFillStyle('lightblue'),
-      IO.forEach(tail, ([x, y]) => C.fillRect(x, y, scaleX, scaleY)),
-      Canvas.fill(),
-    ])
+  const drawTail = pipe(
+    IO.unit(),
+    IO.zipRight(IO.collectAllDiscard([
+      Canvas.setFillStyle('green'),
+      IO.forEach(tail,
+        (point) => IO.zipRight(
+          C.fillPath(C.withContext(drawSegment(...point, scale))),
+          dx == 0 && dy == 0 ? C.strokePath(C.withContext(drawSegment(...point, scale))) : IO.unit()
+        )
+      ),
+    ])),
+    C.withContext,
   )
   const drawHead = C.withContext(
     IO.collectAllDiscard([
-      C.setFillStyle('blue'),
-      C.fillRect(head[0], head[1], scaleX, scaleY),
-      C.fill(),
+      C.withContext(IO.collectAllDiscard([
+        C.setFillStyle('transparent'),
+        C.fillPath(drawSegment(...head, scale, true)),
+        C.rotate(22 * Math.PI / 180),
+        C.rotate(Math.atan2(dy, dx)),
+        C.withContext(C.strokePath(IO.collectAllDiscard([
+          C.beginPath,
+          C.moveTo(0, 0),
+          C.lineTo(scale, 0),
+          C.arc(0, 0, scale, 0,  Math.PI * 1.75),
+          C.lineTo(0, 0),
+          C.closePath,
+        ]))),
+        C.setFillStyle(`hsla(90deg, 50%, 30%, 0.75)`),
+        C.fillPath(IO.collectAllDiscard([
+          C.beginPath,
+          C.moveTo(0, 0),
+          C.lineTo(scale, 0),
+          C.arc(0, 0, scale, 0,  Math.PI * 1.75),
+          C.lineTo(0, 0),
+          C.closePath,
+        ])
+        )
+      ]))
     ])
   )
-  return C.withContext(IO.zipRight(drawTail, drawHead))
+  return C.withContext(
+    IO.zipRight(drawTail, drawHead)
+  )
 }
-
-function drawApple([x, y]: Model['apple']) {
+function drawApple({apple: [x, y], scale}: Model) {
   return C.withContext(
     IO.collectAllDiscard([
-      C.setFillStyle('red'),
-      C.fillPath(
-        C.arc(x + scaleX / 2, y + scaleX / 2, scaleX / 2, 0, Math.PI * 2)
-      ),
+      C.setFillStyle('orange'),
+      C.fillPath(C.withContext(drawSegment(x, y, scale, true))),
     ])
   )
 }
-function drawDebug({ snake: [head, ...tail], apple }: Model) {
+
+function drawSegment(x: number, y: number, scale: number, arc = false) {
+  return (
+    pipe(
+      C.scale(scale, scale),
+      IO.zipRight(C.translate(x, y)),
+      IO.zipRight(C.scale(1 / scale, 1 / scale)),
+      IO.zipRight(
+        arc
+          ? C.arc(0, 0, scale / 2, 0, Math.PI * 2)
+          : C.rect(-scale / 2, -scale / 2, scale, scale)
+      )
+    )
+  )
+}
+function drawDebug({ snake: [head, ...tail] }: Model) {
   return pipe(
     IO.collectAllDiscard([
+      // C.setFillStyle('red'),
+      // C.fillText(
+      //   `[${apple[0].toFixed(0).padEnd(3, ' ')}, ${apple[1].toFixed(0)}]`,
+      //   0,
+      //   15
+      // ),
+      C.fillText(`[Score: ${tail.length + 1}]`, 0, 0),
       C.fillText(
         `[${head[0].toFixed(0).padEnd(3, ' ')}, ${head[1].toFixed(0)}]`,
-        -15,
-        0
+        0,
+        12
       ),
-      C.setFillStyle('red'),
-      C.fillText(
-        `[${apple[0].toFixed(0).padEnd(3, ' ')}, ${apple[1].toFixed(0)}]`,
-        -15,
-        -15
-      ),
-      C.fillText(`[${tail.length + 1}]`, -15, 15),
     ])
   )
 }
