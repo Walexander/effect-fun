@@ -6,7 +6,7 @@ import {
 } from './engine'
 import * as C from 'graphics-ts/Canvas'
 import { NonEmptyArray } from '@effect/data/ReadonlyArray'
-import { whiteBackground } from './draw-game'
+import { gridBackground } from './draw-game'
 import { Model, makeApple, GameEvent } from './model'
 
 export function initialize (engine: Engine<GameEvent>): IO.Effect<CanvasRenderingContext2D, never, Model> {
@@ -21,7 +21,7 @@ export function initialize (engine: Engine<GameEvent>): IO.Effect<CanvasRenderin
         velocity: IO.succeed<[number, number]>([0, 0]),
         publish: IO.succeed(engine.publish.bind(engine)),
         bounds: IO.succeed(rect(-width / 50, -width / 50, width / 50, width / 50)),
-        background: whiteBackground(width, width)
+        background: gridBackground(width, width)
       })
     )
   )

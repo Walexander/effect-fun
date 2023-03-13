@@ -1,17 +1,7 @@
 import * as IO from '@effect/io/Effect'
-import { Rect, rect } from 'graphics-ts/Shape'
 import { pipe } from '@effect/data/Function'
-import {
-  BuiltinEvents,
-  KeyDown,
-  Engine,
-  engineLive,
-  EngineTag,
-  GameTick,
-} from './engine'
 import { Model } from './model'
 import * as C from 'graphics-ts/Canvas'
-import { NonEmptyArray } from '@effect/data/ReadonlyArray'
 import * as RA from '@effect/data/ReadonlyArray'
 const wallThickness = 25
 export const whiteBackground = (width: number, height: number) => pipe(
@@ -29,13 +19,13 @@ export const whiteBackground = (width: number, height: number) => pipe(
   C.withContext,
   IO.zipRight(C.getImageData(0, 0, width, height)),
 )
-const gridBackground = (width: number, height: number) => pipe(
+export const gridBackground = (width: number, height: number, scale = 24) => pipe(
   IO.collectAllDiscard([
     C.clearRect(0, 0, width, height),
     C.setStrokeStyle('lightgrey'),
     C.beginPath,
-    strokeLines(width, 'x'),
-    strokeLines(height, 'y'),
+    strokeLines(width, 'x', scale),
+    strokeLines(height, 'y', scale),
     C.closePath,
     C.fillPath(C.rect(0, 0, wallThickness, height)),
     C.fillPath(C.rect(0, 0, width, wallThickness)),
@@ -46,14 +36,13 @@ const gridBackground = (width: number, height: number) => pipe(
   C.withContext,
   IO.zipRight(C.getImageData(0, 0, width, height)),
 )
-void gridBackground
 
-function strokeLines(size: number, direction: 'x'|'y') {
+function strokeLines(size: number, direction: 'x'|'y', scale: number) {
   return C.strokePath(IO.forEachDiscard(
-    RA.range(0, size / 20)
+    RA.range(0, scale)
     , start =>
         pipe(
-          (gridLine(...<[[number, number], [number, number]]>(
+          (gridLine(scale, ...<[[number, number], [number, number]]>(
             direction == 'x'
               ? [ [start , 0], [start, size] ]
               : [ [0, start], [size, start] ]
@@ -62,16 +51,17 @@ function strokeLines(size: number, direction: 'x'|'y') {
         )
       ))
 }
-function gridLine ([fromX, fromY]: [number, number], [toX, toY]: [number, number])  {
+
+function gridLine (scale: number, [fromX, fromY]: [number, number], [toX, toY]: [number, number])  {
   return C.withContext(IO.collectAllDiscard([
-    C.scale(25, 25),
+    C.scale(scale, scale),
     C.moveTo(fromX, fromY),
     C.lineTo(toX, toY),
   ]))
 }
 
-export function drawGame(state: Model)  {
-  return pipe(
+export function drawGame(state: Model) {
+  return state.ticks % 6 != 0 ? IO.unit() : pipe(
     C.setFillStyle('black'),
     IO.zipRight(C.putImageData(state.background, 0, 0)),
     IO.zipRight(pipe(
@@ -121,9 +111,7 @@ function drawSnake({snake, velocity: [dx, dy], scale}: Model) {
         C.withContext(C.fillPath(IO.collectAllDiscard([
           C.rect(0 - scale / 2, 0 - scale / 2, scale / 2, scale),
           C.rotate(22 * Math.PI / 180),
-          C.moveTo(0, 0),
-          C.lineTo(scale / 2, 0),
-          C.arc(0, 0, scale / 2, 0,  Math.PI * 1.75),
+          C.arc(0, 0, scale / 2, 0,  Math.PI * 2),
           C.lineTo(0, 0),
           C.closePath,
         ]))),

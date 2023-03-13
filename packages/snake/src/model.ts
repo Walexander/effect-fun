@@ -12,6 +12,7 @@ export interface Model {
   readonly scale: number
   readonly dims: [number, number]
   readonly background: ImageData
+  readonly ticks: number
   bounds: Rect
   publish: (event: GameEvent) => IO.Effect<never, never, void>
 }
@@ -26,6 +27,15 @@ export function updateGameState(state: Model, events: Chunk<GameEvent>) {
     events,
     state,
     (model, event) => eventReducer(model, event)
+  )
+}
+
+export function makeApple(
+  min: number,
+  max: number
+): IO.Effect<never, never, Model['apple']> {
+  return IO.randomWith(rnd =>
+    IO.all([rnd.nextIntBetween(min, max), rnd.nextIntBetween(min, max)])
   )
 }
 
@@ -73,13 +83,16 @@ function whiplash(next: [number, number], [neck = [Infinity, Infinity]]: (readon
   return next[0] != 0 && next[1] != 0 && next[0] == neck[0] && next[1] == neck[1]
 }
 
-function onTick(e: GameTick, state: Model) {
+function onTick(e: GameTick, state0: Model) {
   return pipe(
-    applyVelocity(state, e.tick),
+    applyVelocity({
+      ...state0,
+      ticks: e.tick,
+    }, e.tick),
     IO.succeed,
-    IO.tap(({ snake: [head], apple }) =>
+    IO.tap(({ snake: [head], apple, publish }) =>
       head[0] == apple[0] && head[1] == apple[1]
-        ? state.publish({ _tag: 'eats' })
+        ? publish({ _tag: 'eats' })
         : IO.unit()
     ),
     IO.map<Model, Model>(state =>
@@ -93,7 +106,6 @@ function onTick(e: GameTick, state: Model) {
   )
 }
 
-
 function checkCollision(model: Model) {
   const [head, ,...tail]  = model.snake
   return (
@@ -103,19 +115,10 @@ function checkCollision(model: Model) {
   )
 }
 
-export function makeApple(
-  min: number,
-  max: number
-): IO.Effect<never, never, Model['apple']> {
-  return IO.randomWith(rnd =>
-    IO.all([rnd.nextIntBetween(min, max), rnd.nextIntBetween(min, max)])
-  )
-}
-
 function applyVelocity(state: Model, tick: number): Model {
   const [[x, y]] = state.snake
   const [dx, dy] = state.velocity
-  return tick % 4 != 0 || (dx == 0 && dy == 0)
+  return tick % 6 != 0 || (dx == 0 && dy == 0)
     ? state
     : {
         ...state,
