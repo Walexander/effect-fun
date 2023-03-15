@@ -1,55 +1,68 @@
 import * as IO from '@effect/io/Effect'
-import { point } from 'graphics-ts/Shape'
 import { pipe } from '@effect/data/Function'
 import { Model } from './model'
 import * as C from 'graphics-ts/Canvas'
 import * as RA from '@effect/data/ReadonlyArray'
 const wallThickness = 25
-export const whiteBackground = (width: number, height: number) => pipe(
-  IO.collectAllDiscard([
-    C.clearRect(0, 0, width, height),
-    C.setFillStyle('lightgrey'),
-    C.fillPath(C.rect(0, 0,width, height)),
-    C.setFillStyle('red'),
-    C.fillPath(C.rect(0, 0, wallThickness, height)),
-    C.fillPath(C.rect(0, 0, width, wallThickness)),
-    C.fillPath(C.rect(width - wallThickness, 0, wallThickness, height)),
-    C.fillPath(C.rect(0, height - wallThickness, width, wallThickness)),
-    C.fillPath(C.rect(0, 0, 0, 0)),
-  ]),
-  C.withContext,
-  IO.zipRight(C.getImageData(0, 0, width, height)),
-)
-export const gridBackground = (width: number, height: number, scale = 24) => pipe(
-  IO.collectAllDiscard([
-    C.clearRect(0, 0, width, height),
-    C.setStrokeStyle('lightgrey'),
-    C.beginPath,
-    strokeLines(width, 'x', scale),
-    strokeLines(height, 'y', scale),
-    C.closePath,
+export const whiteBackground = (width: number, height: number) =>
+  pipe(
+    IO.collectAllDiscard([
+      C.clearRect(0, 0, width, height),
+      C.setFillStyle('lightgrey'),
+      C.fillPath(C.rect(0, 0, width, height)),
+      C.setFillStyle('red'),
+      C.fillPath(C.rect(0, 0, wallThickness, height)),
+      C.fillPath(C.rect(0, 0, width, wallThickness)),
+      C.fillPath(C.rect(width - wallThickness, 0, wallThickness, height)),
+      C.fillPath(C.rect(0, height - wallThickness, width, wallThickness)),
+      C.fillPath(C.rect(0, 0, 0, 0)),
+    ]),
+    C.withContext,
+    IO.zipRight(C.getImageData(0, 0, width, height))
+  )
+
+function wallGradient(w: number, h: number) {
+  return pipe(
+    IO.collectAllDiscard(<Array<IO.Effect<CanvasGradient, never, unknown>>>[
+      C.addColorStop(0, 'purple'),
+      C.addColorStop(0.33, 'cyan'),
+      C.addColorStop(0.66, 'purple'),
+      C.addColorStop(1, 'cyan'),
+    ]),
+    IO.zipRight(IO.service(C.GradientTag)),
+    IO.provideSomeLayer(IO.toLayer(C.createLinearGradient(0, 0, w, h), C.GradientTag))
+  )
+}
+
+function drawWalls(width: number, height: number, scale: number) {
+  return IO.collectAllDiscard([
     IO.flatMap(
-      IO.tap(
-        C.createLinearGradient(0, 0, width, height),
-        (gradient) => IO.collectAllDiscard([
-          IO.sync(() => gradient.addColorStop(0, 'purple')),
-          IO.sync(() => gradient.addColorStop(0.33, 'cyan')),
-          IO.sync(() => gradient.addColorStop(0.66, 'purple')),
-          IO.sync(() => gradient.addColorStop(1, 'cyan')),
-        ]),
-      ),
+      wallGradient(width, height),
       C.setFillStyle
     ),
     C.fillPath(C.rect(0, 0, scale, height)),
     C.fillPath(C.rect(0, 0, width, scale)),
     C.fillPath(C.rect(width - scale, 0, scale, height)),
     C.fillPath(C.rect(0, height - scale, width, scale)),
-    C.fillPath(C.rect(0, 0, 0, 0)),
-  ]),
-  C.withContext,
-  IO.zipRight(C.getImageData(0, 0, width, height)),
-)
-
+  ])
+}
+export function gridBackground(width: number, height: number, scale = 24) {
+  return IO.zipRight(
+    C.withContext(
+      IO.collectAllDiscard([
+        C.clearRect(0, 0, width, height),
+        C.setStrokeStyle('lightgrey'),
+        C.beginPath,
+        strokeLines(width, 'x', scale),
+        strokeLines(height, 'y', scale),
+        C.closePath,
+        drawWalls(width, height, scale),
+        C.fillPath(C.rect(0, 0, 0, 0)),
+      ])
+    ),
+    C.getImageData(0, 0, width, height)
+  )
+}
 function strokeLines(size: number, direction: 'x' | 'y', scale: number) {
   return C.strokePath(
     IO.forEachDiscard(RA.range(0, scale), start =>
@@ -71,128 +84,127 @@ function strokeLines(size: number, direction: 'x' | 'y', scale: number) {
   )
 }
 
-function gridLine (scale: number, [fromX, fromY]: [number, number], [toX, toY]: [number, number])  {
-  return C.withContext(IO.collectAllDiscard([
-    C.scale(scale, scale),
-    C.moveTo(fromX, fromY),
-    C.lineTo(toX, toY),
-  ]))
+function gridLine(
+  scale: number,
+  [fromX, fromY]: [number, number],
+  [toX, toY]: [number, number]
+) {
+  return C.withContext(
+    IO.collectAllDiscard([
+      C.scale(scale, scale),
+      C.moveTo(fromX, fromY),
+      C.lineTo(toX, toY),
+    ])
+  )
 }
 
 export function drawGame(state: Model) {
-  return state.ticks == 0 ? IO.unit() : pipe(
-    C.setFillStyle('black'),
-    IO.zipRight(C.putImageData(state.background, 0, 0)),
-    IO.zipRight(pipe(
-      C.translate(state.dims[0] / 2,state.dims[1]  / 2),
-      IO.zipRight(C.withContext(
-        IO.collectAll([
-          C.translate(state.dims[0] / -2.25, state.dims[1] / -2.75),
-          C.scale(state.scale / 6, state.scale / 6),
-          drawDebug(state)
-        ])
+  return state.ticks % 4 == 0
+    ? IO.unit()
+    : IO.collectAllDiscard([
+      C.putImageData(state.background, 0, 0),
+      C.withContext(pipe(
+        C.translate(state.dims[0] / 2, state.dims[1] / 2),
+        IO.zipRight(
+          C.withContext(
+            IO.collectAll([
+              C.translate(state.dims[0] / -2.25, state.dims[1] / -2.75),
+              C.scale(state.scale / 6, state.scale / 6),
+              drawDebug(state),
+            ])
+          )
+        ),
+        IO.zipRight(IO.collectAll([drawSnake(state), drawApple(state)]))
       )),
-      IO.zipRight(
-        IO.collectAll([
-          drawSnake(state),
-          drawApple(state),
-        ])
-      ),
-      C.withContext
-    )),
-    IO.as(void null)
-  )
+    ])
 }
 
-function drawSnake({snake, velocity: [dx, dy], scale, headPosition, updateRate}: Model) {
-  const Canvas = C
+function drawSnake({
+  snake,
+  velocity: [dx, dy],
+  scale,
+  headPosition,
+  updateRate,
+}: Model) {
   const [head, ...tail] = snake
   const drawTail = pipe(
     IO.unit(),
-    IO.zipRight(IO.collectAllDiscard([
-      C.setFillStyle(`green`),
-      IO.forEach(tail,
-        (point) => IO.zipRight(
-          C.fillPath(C.withContext(drawSegment(
-            ...point,
-            scale,
-          ))),
-          dx == 0 && dy == 0 ? C.strokePath(C.withContext(drawSegment(
-            ...point, scale))) : IO.unit()
-        )
-      ),
-    ])),
-    C.withContext,
+    IO.zipRight(
+      IO.collectAllDiscard([
+        C.setFillStyle(`green`),
+        IO.forEach(tail, point =>
+          IO.zipRight(
+            C.fillPath(C.withContext(drawSegment(...point, scale))),
+            dx == 0 && dy == 0
+              ? C.strokePath(C.withContext(drawSegment(...point, scale)))
+              : IO.unit()
+          )
+        ),
+      ])
+    ),
+    C.withContext
   )
   const drawHead = C.withContext(
     IO.collectAllDiscard([
-      C.withContext(IO.collectAllDiscard([
-        C.setFillStyle('transparent'),
-        C.fillPath(
-          updateRate <= 10
-          ? drawSegment(...head, scale, true)
-          : drawSegment(headPosition.x, headPosition.y, scale, false)
-        ),
-        //
-        C.rotate(Math.atan2(dy, dx)),
-        C.setFillStyle(`black`),
-        C.withContext(C.fillPath(IO.collectAllDiscard([
-          C.rect(-scale / 2, -scale / 2, scale / 2, scale),
-          C.rotate(22 * Math.PI / 180),
-          C.arc(0, 0, scale / 2, 0,  Math.PI * 2),
-          C.lineTo(0, 0),
-          C.closePath,
-        ]))),
-      ]))
+      C.withContext(
+        IO.collectAllDiscard([
+          C.setFillStyle('transparent'),
+          C.fillPath(
+            updateRate <= 10
+              ? drawSegment(...head, scale, true)
+              : drawSegment(headPosition.x, headPosition.y, scale, false)
+          ),
+          //
+          C.rotate(Math.atan2(dy, dx)),
+          C.setFillStyle(`black`),
+          C.withContext(
+            C.fillPath(
+              IO.collectAllDiscard([
+                C.rect(-scale / 2, -scale / 2, scale / 2, scale),
+                C.rotate((22 * Math.PI) / 180),
+                C.arc(0, 0, scale / 2, 0, Math.PI * 2),
+                C.lineTo(0, 0),
+                C.closePath,
+              ])
+            )
+          ),
+        ])
+      ),
     ])
   )
-  return C.withContext(
-    IO.zipRight(drawTail, drawHead)
-  )
+  return C.withContext(IO.zipRight(drawTail, drawHead))
 }
-function drawApple({apple: [x, y], scale}: Model) {
+function drawApple({ apple: [x, y], scale }: Model) {
   return C.withContext(
     IO.collectAllDiscard([
-      C.setFillStyle('orange'),
+      C.setFillStyle('red'),
       C.fillPath(C.withContext(drawSegment(x, y, scale, true))),
     ])
   )
 }
 
 function drawSegment(x: number, y: number, scale: number, arc = false) {
-  return (
-    pipe(
-      C.scale(scale, scale),
-      IO.zipRight(C.translate(x, y)),
-      IO.zipRight(C.scale(1 / scale, 1 / scale)),
-      IO.zipRight(
-        arc
-          ? C.arc(0, 0, scale / 2, 0, Math.PI * 2)
-          : C.rect(-scale / 2, -scale / 2, scale, scale)
-      )
+  return pipe(
+    C.scale(scale, scale),
+    IO.zipRight(C.translate(x, y)),
+    IO.zipRight(C.scale(1 / scale, 1 / scale)),
+    IO.zipRight(
+      arc
+        ? C.arc(0, 0, scale / 2, 0, Math.PI * 2)
+        : C.rect(-scale / 2, -scale / 2, scale, scale)
     )
   )
 }
 function drawDebug({ updateRate, snake: [head, ...tail] }: Model) {
   return pipe(
     IO.collectAllDiscard([
-      // C.setFillStyle('red'),
-      // C.fillText(
-      //   `[${apple[0].toFixed(0).padEnd(3, ' ')}, ${apple[1].toFixed(0)}]`,
-      //   0,
-      //   15
-      // ),
       C.fillText(`[Score: ${tail.length + 1}]`, 0, 0),
       C.fillText(
         `[${head[0].toFixed(0).padEnd(3, ' ')}, ${head[1].toFixed(0)}]`,
         0,
         12
       ),
-      C.fillText(
-        updateRate.toFixed(0).padEnd(5),
-        0,
-        24
-      ),
+      C.fillText(updateRate.toFixed(0).padEnd(5), 0, 24),
     ])
   )
 }
