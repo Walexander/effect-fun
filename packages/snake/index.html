@@ -12,7 +12,18 @@
   <body>
     <h1>Here's a canvas?</h1>
     <div style="display: flex">
-    <canvas id=canvas width=600 height=600 style="outline: 1px solid blue; margin: auto; width: 100%; aspect-ratio: 1/1"></canvas>
+<style>
+body {
+  --max: min(1200px, min(95vh, 95vw));
+}
+canvas {
+  width: 100%;
+  margin: auto;
+  max-width: var(--max);
+  aspect-ratio: 1/1;
+}
+</style>
+    <canvas id=canvas width=600 height=600 style=""></canvas>
     </div>
     <script type="module">
 
