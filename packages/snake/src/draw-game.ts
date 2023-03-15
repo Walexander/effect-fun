@@ -1,4 +1,5 @@
 import * as IO from '@effect/io/Effect'
+import { point } from 'graphics-ts/Shape'
 import { pipe } from '@effect/data/Function'
 import { Model } from './model'
 import * as C from 'graphics-ts/Canvas'
@@ -27,29 +28,47 @@ export const gridBackground = (width: number, height: number, scale = 24) => pip
     strokeLines(width, 'x', scale),
     strokeLines(height, 'y', scale),
     C.closePath,
-    C.fillPath(C.rect(0, 0, wallThickness, height)),
-    C.fillPath(C.rect(0, 0, width, wallThickness)),
-    C.fillPath(C.rect(width - wallThickness, 0, wallThickness, height)),
-    C.fillPath(C.rect(0, height - wallThickness, width, wallThickness)),
+    IO.flatMap(
+      IO.tap(
+        C.createLinearGradient(0, 0, width, height),
+        (gradient) => IO.collectAllDiscard([
+          IO.sync(() => gradient.addColorStop(0, 'purple')),
+          IO.sync(() => gradient.addColorStop(0.33, 'cyan')),
+          IO.sync(() => gradient.addColorStop(0.66, 'purple')),
+          IO.sync(() => gradient.addColorStop(1, 'cyan')),
+        ]),
+      ),
+      C.setFillStyle
+    ),
+    C.fillPath(C.rect(0, 0, scale, height)),
+    C.fillPath(C.rect(0, 0, width, scale)),
+    C.fillPath(C.rect(width - scale, 0, scale, height)),
+    C.fillPath(C.rect(0, height - scale, width, scale)),
     C.fillPath(C.rect(0, 0, 0, 0)),
   ]),
   C.withContext,
   IO.zipRight(C.getImageData(0, 0, width, height)),
 )
 
-function strokeLines(size: number, direction: 'x'|'y', scale: number) {
-  return C.strokePath(IO.forEachDiscard(
-    RA.range(0, scale)
-    , start =>
-        pipe(
-          (gridLine(scale, ...<[[number, number], [number, number]]>(
-            direction == 'x'
-              ? [ [start , 0], [start, size] ]
-              : [ [0, start], [size, start] ]
-          ))
-          )
+function strokeLines(size: number, direction: 'x' | 'y', scale: number) {
+  return C.strokePath(
+    IO.forEachDiscard(RA.range(0, scale), start =>
+      pipe(
+        gridLine(
+          scale,
+          ...(<[[number, number], [number, number]]>(direction == 'x'
+            ? [
+                [start, 0],
+                [start, size],
+              ]
+            : [
+                [0, start],
+                [size, start],
+              ]))
         )
-      ))
+      )
+    )
+  )
 }
 
 function gridLine (scale: number, [fromX, fromY]: [number, number], [toX, toY]: [number, number])  {
@@ -61,7 +80,7 @@ function gridLine (scale: number, [fromX, fromY]: [number, number], [toX, toY]: 
 }
 
 export function drawGame(state: Model) {
-  return state.ticks % 6 != 0 ? IO.unit() : pipe(
+  return state.ticks == 0 ? IO.unit() : pipe(
     C.setFillStyle('black'),
     IO.zipRight(C.putImageData(state.background, 0, 0)),
     IO.zipRight(pipe(
@@ -85,17 +104,21 @@ export function drawGame(state: Model) {
   )
 }
 
-function drawSnake({snake, velocity: [dx, dy], scale}: Model) {
+function drawSnake({snake, velocity: [dx, dy], scale, headPosition, updateRate}: Model) {
   const Canvas = C
   const [head, ...tail] = snake
   const drawTail = pipe(
     IO.unit(),
     IO.zipRight(IO.collectAllDiscard([
-      Canvas.setFillStyle('green'),
+      C.setFillStyle(`green`),
       IO.forEach(tail,
         (point) => IO.zipRight(
-          C.fillPath(C.withContext(drawSegment(...point, scale))),
-          dx == 0 && dy == 0 ? C.strokePath(C.withContext(drawSegment(...point, scale))) : IO.unit()
+          C.fillPath(C.withContext(drawSegment(
+            ...point,
+            scale,
+          ))),
+          dx == 0 && dy == 0 ? C.strokePath(C.withContext(drawSegment(
+            ...point, scale))) : IO.unit()
         )
       ),
     ])),
@@ -105,11 +128,16 @@ function drawSnake({snake, velocity: [dx, dy], scale}: Model) {
     IO.collectAllDiscard([
       C.withContext(IO.collectAllDiscard([
         C.setFillStyle('transparent'),
-        C.fillPath(drawSegment(...head, scale, true)),
+        C.fillPath(
+          updateRate <= 10
+          ? drawSegment(...head, scale, true)
+          : drawSegment(headPosition.x, headPosition.y, scale, false)
+        ),
+        //
         C.rotate(Math.atan2(dy, dx)),
-        C.setFillStyle(`green`),
+        C.setFillStyle(`black`),
         C.withContext(C.fillPath(IO.collectAllDiscard([
-          C.rect(0 - scale / 2, 0 - scale / 2, scale / 2, scale),
+          C.rect(-scale / 2, -scale / 2, scale / 2, scale),
           C.rotate(22 * Math.PI / 180),
           C.arc(0, 0, scale / 2, 0,  Math.PI * 2),
           C.lineTo(0, 0),
@@ -145,7 +173,7 @@ function drawSegment(x: number, y: number, scale: number, arc = false) {
     )
   )
 }
-function drawDebug({ snake: [head, ...tail] }: Model) {
+function drawDebug({ updateRate, snake: [head, ...tail] }: Model) {
   return pipe(
     IO.collectAllDiscard([
       // C.setFillStyle('red'),
@@ -159,6 +187,11 @@ function drawDebug({ snake: [head, ...tail] }: Model) {
         `[${head[0].toFixed(0).padEnd(3, ' ')}, ${head[1].toFixed(0)}]`,
         0,
         12
+      ),
+      C.fillText(
+        updateRate.toFixed(0).padEnd(5),
+        0,
+        24
       ),
     ])
   )

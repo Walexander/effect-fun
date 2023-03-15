@@ -2,7 +2,7 @@ import * as IO from '@effect/io/Effect'
 import { pipe } from '@effect/data/Function'
 import {
   Engine,
-  engineLive,
+  LiveDomEngine,
   EngineTag,
 } from './engine'
 import * as C from 'graphics-ts/Canvas'
@@ -12,6 +12,7 @@ export function main(canvasId: string) {
   return IO.runPromise(
     pipe(
       program,
+      IO.provideSomeLayer(LiveDomEngine(Engine)),
       C.renderTo(canvasId),
       IO.catchAllCause(IO.logErrorCause)
     )
@@ -19,13 +20,6 @@ export function main(canvasId: string) {
 }
 const Engine = EngineTag<GameEvent>()
 
-const program = pipe(
-  IO.serviceWithEffect(Engine, engine =>
-    engine.renderLoop(initialize(engine),
-      updateGameState,
-      drawGame
-    )
-  ),
-  IO.provideSomeLayer(engineLive(Engine))
+const program = IO.serviceWithEffect(Engine, engine =>
+  engine.renderLoop(initialize(engine), updateGameState, drawGame)
 )
-

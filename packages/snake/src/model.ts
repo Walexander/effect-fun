@@ -1,6 +1,6 @@
 import * as IO from '@effect/io/Effect'
 import { GameTick, BuiltinEvents, KeyDown } from './engine'
-import { Rect } from 'graphics-ts/Shape'
+import { Rect, Point, point } from 'graphics-ts/Shape'
 import { NonEmptyArray, dropRight } from '@effect/data/ReadonlyArray'
 import * as Chunk from '@effect/data/Chunk'
 import {pipe} from '@effect/data/Function'
@@ -9,10 +9,13 @@ export interface Model {
   readonly snake: NonEmptyArray<readonly [number, number]>
   readonly apple: readonly [number, number]
   readonly velocity: [number, number]
+  readonly lastVelocity: Point
+  readonly headPosition: Point
   readonly scale: number
   readonly dims: [number, number]
   readonly background: ImageData
   readonly ticks: number
+  readonly updateRate: number
   bounds: Rect
   publish: (event: GameEvent) => IO.Effect<never, never, void>
 }
@@ -59,6 +62,7 @@ function eventReducer(
           // eslint-disable-next-line
           snake: [...state.snake, state.snake.at(-1)!],
           apple,
+          updateRate: state.updateRate > 6 && state.snake.length % 5 == 0 ? state.updateRate / 2 : state.updateRate
         })
       )
 
@@ -116,13 +120,24 @@ function checkCollision(model: Model) {
 }
 
 function applyVelocity(state: Model, tick: number): Model {
+  const tickInterval = state.updateRate
   const [[x, y]] = state.snake
   const [dx, dy] = state.velocity
-  return tick % 6 != 0 || (dx == 0 && dy == 0)
-    ? state
+  return dx == 0 && dy == 0
+  ? state :
+    tick % tickInterval != 0
+    ? {
+      ...state,
+      headPosition: point(
+        state.headPosition.x + (state.lastVelocity.x * (1/tickInterval)),
+        state.headPosition.y + (state.lastVelocity.y * (1/tickInterval)),
+      ),
+    }
     : {
         ...state,
+        lastVelocity: point(dx, dy),
         snake: [[x + dx, y + dy] as const, ...dropRight(1)(state.snake)],
+        headPosition: point(x, y),
       }
 }
 
@@ -139,6 +154,8 @@ function velocityFromKey(
       return y == 0 ? [0, -1] : [x, y]
     case 'ArrowDown':
       return y == 0 ? [0, 1] : [x, y]
+    case 'Space':
+      return [0, 0]
     default:
       return [x, y]
   }
