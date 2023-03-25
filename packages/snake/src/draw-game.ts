@@ -127,22 +127,16 @@ function drawSnake({
   updateRate,
 }: Model) {
   const [head, ...tail] = snake
-  const drawTail = pipe(
-    IO.unit(),
-    IO.zipRight(
-      IO.collectAllDiscard([
-        C.setFillStyle(`green`),
-        IO.forEach(tail, point =>
-          IO.zipRight(
-            C.fillPath(C.withContext(drawSegment(...point, scale))),
-            dx == 0 && dy == 0
-              ? C.strokePath(C.withContext(drawSegment(...point, scale)))
-              : IO.unit()
-          )
-        ),
-      ])
-    ),
-    C.withContext
+  const drawTail = C.withContext(
+    IO.collectAllDiscard([
+      C.setFillStyle(`green`),
+      IO.forEach(tail, point =>
+        IO.zipRight(
+          C.fillPath(C.withContext(drawSegment(...point, scale))),
+          C.strokePath(C.withContext(drawSegment(...point, scale)))
+        )
+      ),
+    ])
   )
   const drawHead = C.withContext(
     IO.collectAllDiscard([
@@ -150,7 +144,7 @@ function drawSnake({
         IO.collectAllDiscard([
           C.setFillStyle('transparent'),
           C.fillPath(
-            updateRate <= 10
+            updateRate <= 6
               ? drawSegment(...head, scale, true)
               : drawSegment(headPosition.x, headPosition.y, scale, false)
           ),

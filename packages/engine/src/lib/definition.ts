@@ -22,7 +22,6 @@ export interface KeyDown {
 }
 export type BuiltinEvents = GameTick | KeyDown | KeyUp
 
-
 export interface Engine<Event> {
   publish(event: Event|BuiltinEvents): IO.Effect<never, never, void>
   renderLoop<A, R1, R2>(
