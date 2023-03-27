@@ -1,24 +1,20 @@
-import * as IO from '@effect/io/Effect'
-import * as MQ from '@effect/data/MutableQueue'
 import { Tetromino } from './tetromino'
-import * as RA from '@effect/data/ReadonlyArray'
 import * as Board from './board'
 import type { GameGrid } from './board'
-import { shuffledDeck } from './deck'
-import { point, path as path$, Point } from 'graphics-ts/Shape'
+import { point } from 'graphics-ts/Shape'
 import * as Deck from './deck'
 
 export interface TetrisModel<Board> {
-  readonly score: number
+  readonly active: Tetromino
   readonly board: Board
-  // readonly tickInterval: Duration
   readonly bullpen: Deck.Deck
+  readonly isOver: boolean
+  readonly score: number
   readonly status: 'Active' | 'Paused' | 'Over'
 }
-export interface TetrisGame extends TetrisModel<GameGrid<Tetromino>> {
-  readonly score: number
+export interface TetrisGame extends TetrisModel<GameGrid> {
   drop(): TetrisGame
-  move(direction: 'L'|'R'): TetrisGame
+  move(direction: 'L' | 'R'): TetrisGame
   tick(): TetrisGame
   toggle(): TetrisGame
   spin(direction: 'L' | 'R'): TetrisGame
@@ -47,64 +43,69 @@ export class PausedTetrisGame implements TetrisGame {
   spin(): TetrisGame { return this }
 
 }
-export class TetrisModelImpl implements TetrisGame {
-  constructor(readonly score: number,
-    readonly board: GameGrid<Tetromino>,
-    // readonly tickInterval: Duration = millis(160),
+export class ActiveTetrisGame implements TetrisGame {
+  constructor(
+    readonly score: number,
+    readonly board: GameGrid,
     readonly bullpen = Deck.make(),
-    readonly status: 'Active' | 'Paused' = 'Paused'
+    readonly status: 'Active' | 'Paused' | 'Over' = 'Paused',
+    readonly active: Tetromino
   ) {}
 
+  get isOver() {
+    return this.status == 'Over'
+  }
+
   drop(): TetrisGame {
-    return new TetrisModelImpl(this.score,
-      this.board.add(this.board.active.translate(point(0, 1))),
+    return new ActiveTetrisGame(
+      this.score,
+      this.board,
       this.bullpen,
-      this.status
+      this.status,
+      this.active.translate(point(0, 1))
     )
   }
 
-  move(direction: 'L'|'R'): TetrisGame {
+  move(direction: 'L' | 'R'): TetrisGame {
     const modifier = direction == 'L' ? -1 : 1
-    const updated = this.board.active.translate(
-      point(modifier, 0)
+    const updated = this.active.translate(point(modifier, 0))
+    return new ActiveTetrisGame(
+      this.score,
+      this.board,
+      this.bullpen,
+      this.status,
+      this.board.isLegal(updated.path) ? updated : this.active
     )
-    const active = updated.path.points.every(
-      this.board.isLegal.bind(this.board)
-    )
-      ? updated
-      : this.board.active
-    return new TetrisModelImpl(this.score, this.board.add(active), this.bullpen)
   }
 
   tick(): TetrisGame {
-    const next = this.board.active.translate(point(0, 1))
-    const touching = next.path.points.some(({ x, y }) => y == this.board.floor[x])
-    if(!touching)
-      return new TetrisModelImpl(this.score, this.board.add(next), this.bullpen)
+    const next = this.active.translate(point(0, 1))
+    const touching = this.board.touches(next.path)
+    return touching
+      ? this.lockAndClear()
+      : new ActiveTetrisGame(
+          this.score,
+          this.board,
+          this.bullpen,
+          this.status,
+          next
+        )
+  }
 
-    const [score, board] = this.board.lock(
-      this.bullpen.next()
-        .translate(point(Math.floor(this.board.dimensions.width / 2), 0))
-    ).clear()
+  lockAndClear() {
+    const next_ = this.bullpen
+      .next()
+      .translate(point(Math.floor(this.board.dimensions.width / 2), 0))
+    const [score, board] = this.board
+      .lock(this.active.path, this.active.color)
+      .clear()
 
-    return new TetrisModelImpl(
+    return new ActiveTetrisGame(
       score + this.score,
       board,
       this.bullpen,
-      this.status
-    )
-  }
-
-  spin(direction: 'L'|'R'): TetrisGame {
-    return new TetrisModelImpl(
-      this.score,
-      this.board.add(
-        direction == 'L'
-          ? this.board.active.turnLeft()
-          : this.board.active.turnRight()
-      ),
-      this.bullpen,
-      this.status
+      this.active.path.points.some(({ y }) => y <= 0) ? 'Over' : this.status,
+      next_
     )
   }
 
@@ -116,6 +117,33 @@ export class TetrisModelImpl implements TetrisGame {
       this.active
     )
   }
+
+  spin(direction: 'L' | 'R'): TetrisGame {
+    let next =
+      direction == 'L' ? this.active.turnLeft() : this.active.turnRight()
+    // wall kick
+    if (next.path.points.some(_ => _.x < 0)) next = next.translate(point(1, 0))
+    else if (next.path.points.some(_ => _.x >= this.board.dimensions.width))
+    next = next.translate(point(-1, 0))
+    // floor kick
+    if (next.path.points.some(_ => _.y >= this.board.dimensions.height))
+    next = next.translate(point(0,
+      next.path.points.reduce(
+        (pMax, p) => (p.y >= pMax ? p.y : pMax),
+        0
+      ) - this.board.dimensions.height - 1
+    ))
+
+    return this.board.isLegal(next.path)
+      ? new ActiveTetrisGame(
+        this.score,
+        this.board,
+        this.bullpen,
+        this.status,
+        next
+      )
+      : this
+  }
 }
 
 export function make(
@@ -124,6 +152,6 @@ export function make(
   deck: Deck.Deck
 ): TetrisGame {
   const active = deck.next().translate(point(Math.floor(width / 2), 1))
-  const board = Board.empty(width, height, active)
-  return new TetrisModelImpl(0, board, deck, 'Active')
+  const board = Board.empty(width, height)
+  return new ActiveTetrisGame(0, board, deck, 'Active', active)
 }

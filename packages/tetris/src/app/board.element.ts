@@ -1,49 +1,16 @@
-import * as Board from './model/board'
-
 import * as RA from '@effect/data/ReadonlyArray'
 import { customElement, property } from 'lit/decorators.js'
-import {classMap} from 'lit/directives/class-map.js'
+import { classMap } from 'lit/directives/class-map.js'
 import { html, css, LitElement } from 'lit'
-import { point, path as path$ } from 'graphics-ts/Shape'
 import { Tetromino } from './model/tetromino'
-import { shuffle } from './model/deck'
-import './deck.element'
-import {pipe} from '@effect/data/Function'
-const path = path$(RA.Foldable)
+import * as Color from 'graphics-ts/Color'
+import { pipe } from '@effect/data/Function'
+
+import * as Board from './model/board'
 
 @customElement('tetris-board')
 export class TetrisBoardElement extends LitElement {
   static styles = css`
-  main {
-    position: relative;
-    display: flex;
-    flex-direction: row;
-    min-height: 90vh;
-    padding: 2rem 0;
-  }
-  main.over {
-      --over: '';
-      --over-text: 'Game Over!';
-  }
-  .board::before {
-    content: var(--over, unset);
-    position: absolute;
-    left:0;
-    right: 0;
-    bottom: 0;
-    top: 0;
-    background: hsla(180deg 50% 50% /0.9);
-    backdrop-filter: blur(4px);
-  }
-  .board::after {
-    content: var(--over-text, unset);
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    color: red;
-    font-size: 2rem;
-  }
     .board {
       position: relative;
       flex-basis: 90%;
@@ -74,7 +41,9 @@ export class TetrisBoardElement extends LitElement {
     }
   `
   @property({ attribute: false })
-  declare board: Board.GameGrid<Tetromino>
+  declare board: Board.GameGrid
+  @property({ attribute: false })
+  declare active: Tetromino
 
   @property({ type: Number })
   declare width: number
@@ -90,24 +59,39 @@ export class TetrisBoardElement extends LitElement {
   render() {
     const { width, height } = this.board.dimensions
     const row = (rowId: number) =>
-      RA.range(0, width - 1).map(
-        colId => pipe(
-          [`cell-${rowId}-${colId}`,
-           {
-              cell: true,
-              full: this.board.filled({x: colId, y: rowId}),
-              last: rowId == height
-            }
-          ] as const,
-          ([id, classes]) => html`<div id=${id} class=${classMap(classes)}">x</div>`
+      RA.range(0, width - 1).map(colId => {
+        const id = `cell-${rowId}-${colId}`
+        const color =
+          this.board.filled({ x: colId, y: rowId }) ||
+          (this.active.path.points.some(
+            ({ x, y }) => x == colId && y == rowId
+          ) &&
+            this.active.color) ||
+          false
+        const classes = {
+          cell: true,
+          full: !!color,
+          last: rowId == height,
+        }
+        return pipe(
+          html`<div style="--bg: ${toColor(color)}" id=${id} class=${classMap(
+            classes
+          )}">x</div>`
         )
-      )
+      })
     return html`
       <main>
-        <section class=board style="--size: 2.5rem; --col-count: ${width}; --row-count: ${height}">
+        <section
+          class="board"
+          style="--size: 2.5rem; --col-count: ${width}; --row-count: ${height}"
+        >
           ${RA.range(0, height).map(row)}
         </section>
       </main>
-`
+    `
   }
+}
+
+function toColor(color: false | Color.Color) {
+  return Color.toCss(color || Color.white)
 }

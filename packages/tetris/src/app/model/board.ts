@@ -1,56 +1,40 @@
 import type { Path, Point } from 'graphics-ts/Shape'
-import { path as path$, point} from 'graphics-ts/Shape'
 import * as RA from '@effect/data/ReadonlyArray'
 import * as N from '@effect/data/Number'
 import * as O from '@effect/data/Option'
 import * as Tuple from '@effect/data/Tuple'
+import { Color, black } from 'graphics-ts/Color'
 import { flow, identity, pipe, constant  } from '@effect/data/Function'
-import { Tetromino } from './tetromino'
-
-const path = path$(RA.Foldable)
-
-export interface GameGrid<T> {
-  // activate: (t: T) => GameGrid<T>
-  readonly active: T
-  add: (t: T) => GameGrid<T>
-  clear: () => readonly [number, GameGrid<T>]
+export interface GameGrid {
+  clear: () => readonly [number, GameGrid]
   readonly dimensions: { width: number; height: number }
-  filled: <P extends { x: number; y: number }>(p: P) => boolean
+  filled: <P extends { x: number; y: number }>(p: P) => Color|false
   readonly floor: number[]
-  isLegal: (point: Point) => boolean
-  lock(next: T): GameGrid<T>
-  isOver: boolean
+  isLegal: (path: Path) => boolean
+  lock(next: Path, color: Color): GameGrid
+  touches: (path: Path) => boolean
 }
 
-const plusPoint = (p1: Point) => (p2: Point) => point(p1.x + p2.x, p1.y + p2.y)
-class BoardData implements GameGrid<Tetromino> {
+class BoardData implements GameGrid {
   constructor(
     readonly dims: { width: number; height: number },
-    readonly grid: boolean[][],
-    readonly active: Tetromino,
+    readonly grid: (Color|false)[][],
   ) {}
 
-  add(piece: Tetromino): GameGrid<Tetromino> {
-    return piece.path.points.every(
-        ({x, y}) => (x >= 0 && x < this.dims.width) && (y < 0 || !this.grid[y][x]))
-      ? new BoardData(this.dims, this.grid, piece)
-      : this
-  }
-
-  clear(): [number, GameGrid<Tetromino>] {
+  clear(): [number, GameGrid] {
     const grid = RA.filter(this.grid, this.isClear.bind(this))
     const score = this.grid.length - grid.length
-    const emptyRows =
+    const emptyRows: Array<Color|false>[] =
       score > 0
         ? RA.makeBy(score, constant(RA.makeBy(this.dims.width, constant(false))))
         : RA.empty()
-    return Tuple.tuple<[number, GameGrid<Tetromino>]>(
+    return Tuple.tuple<[number, GameGrid]>(
       score,
-      new BoardData(this.dims, RA.prependAll(grid, emptyRows), this.active)
+      new BoardData(this.dims, RA.prependAll(grid, emptyRows))
     )
   }
 
-  isClear(row: boolean[], rowIndex: number) {
+  isClear(row: (Color|false)[], rowIndex: number) {
     return rowIndex == this.dims.height || row.some(locked => !locked)
   }
 
@@ -61,8 +45,9 @@ class BoardData implements GameGrid<Tetromino> {
   }
 
   filled(point: Point) {
-    return this.grid[point.y][point.x] ||
-      !!this.active.path.points.some(({x, y}) => x == point.x && y == point.y)
+    return point.y < this.grid.length &&
+      point.x < this.dimensions.width &&
+      point.y >= 0 && this.grid[point.y][point.x]
   }
 
   get floor() {
@@ -75,50 +60,29 @@ class BoardData implements GameGrid<Tetromino> {
     )
   }
 
-  drop() {
-    return new BoardData(this.dims, this.grid,
-      this.active.translate(plusPoint(point(0, 1))(this.active.translation))
+  isLegal(path: Path) {
+    return path.points.every(({x, y}) =>
+      !this.grid[y]?.[x] && x >= 0 && x < this.dimensions.width
     )
   }
 
-  move(direction: 'L' | 'R') {
-    const modifier = direction == 'L' ? -1 : 1
-    const updated = this.active.translate(plusPoint(point(modifier, 0))(this.active.translation))
-
-
-    path(this.active.path.points.map(({x, y}) => point(x + modifier, y)))
-
-    return new BoardData(this.dims, this.grid,
-      updated.path.points.every(this.isLegal.bind(this)) ? updated : this.active
-    )
-  }
-  rotate(direction: 'L' | 'R') {
-    const active = direction == 'L' ? this.active.turnLeft() : this.active.turnRight()
-    return new BoardData(this.dimensions, this.grid, active)
+  touches(path: Path) {
+    return path.points.some(this.filled.bind(this))
   }
 
-  isLegal(point: Point) {
-    return !this.grid[point.y]?.[point.x] && point.x >= 0 && point.x < this.dimensions.width
-  }
-
-  lock(next: Tetromino): GameGrid<Tetromino> {
+  lock(next: Path, color: Color): GameGrid {
     const grid = pipe(
-      this.active?.path.points || [],
-      RA.filter(p => p.x < this.dims.width && p.y < this.dims.height),
+      next.points || [],
       RA.reduce(this.grid, (prev, curr) =>
-        RA.modify(prev, curr.y, row => RA.modify(row, curr.x, constant(true)))
+        RA.modify(prev, curr.y, row => RA.modify(row, curr.x, constant(color)))
       )
     )
-    return new BoardData(this.dims, grid, next)
-  }
-
-  get isOver() {
-    return this.active.path.points.some(_ => this.grid[_.y][_.x])
+    return new BoardData(this.dims, grid)
   }
 }
 
-export function empty(width: number, height: number, active: Tetromino): GameGrid<Tetromino> {
-  return new BoardData({ width, height }, makeGrid(width, height), active)
+export function empty(width: number, height: number): GameGrid {
+  return new BoardData({ width, height }, makeGrid(width, height))
 }
 
 export function transpose<A>(array: A[][]) {
@@ -128,9 +92,9 @@ export function transpose<A>(array: A[][]) {
   )
 }
 
-function makeGrid(width: number, height: number): boolean[][] {
+function makeGrid(width: number, height: number): (Color|false)[][] {
   return new Array(height)
     .fill(new Array(width).fill(false))
     .map(_ => _.slice(0))
-    .concat([new Array(width).fill(true).slice(0)])
+    .concat([new Array(width).fill(black).slice(0)])
 }

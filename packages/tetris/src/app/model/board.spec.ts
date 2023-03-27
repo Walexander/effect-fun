@@ -3,12 +3,13 @@ import * as S from 'graphics-ts/Shape'
 import * as RA from '@effect/data/ReadonlyArray'
 import * as IO from '@effect/io/Effect'
 import {shuffledDeck} from './deck'
+import {black} from 'graphics-ts/Color'
 
 const path = S.path(RA.Foldable)
 const point = S.point
 describe('Board', () => {
   const deck = IO.runSync(shuffledDeck())
-  const empty = (width: number, height: number) => Board.empty(width, height, deck[0])
+  const empty = (width: number, height: number) => Board.empty(width, height)
   it('can be created', () => {
     const board = empty(10, 20)
     expect(board).to.be.ok
@@ -22,11 +23,20 @@ describe('Board', () => {
       }))
   })
 
+  describe('lock', () => {
+    it('cannot lock rows outside of dims', () =>
+      expect(empty(1, 1)
+        .lock(path([point(1, 1)]), black)
+        ).to.deep.equal(
+        Board.empty(1,1)
+      )
+    )
+  })
   describe('empty', () => {
-    const board = Board.empty(3, 3, deck[0])
+    const board = Board.empty(3, 3)
     it('returns a grid', () =>
       expect(board
-        .lock(deck[0])).to.be.ok)
+        .lock(deck[0].path, deck[0].color)).to.be.ok)
 
     describe('floor', () => {
       it('returns one element for each row', () =>
@@ -35,30 +45,19 @@ describe('Board', () => {
       it('empty grid has floor equal to width', () =>
         expect(board.floor).to.deep.equal([3, 3, 3]))
 
-      // it.skip('lock updates the floor', () =>
-      //   expect(
-      //     board.add(deck)
-      //     .lock().floor
-      //   ).to.deep.equal([2, 2, 3]))
-      // it('lock updates the floor', () =>
-      //   expect(
-      //     board.add(path([point(0, 2), point(0, 1)])).lock().floor
-      //   ).to.deep.equal([1, 3, 3]))
+      it('lock updates horizonal floor', () =>
+        expect(
+          board
+          .lock(path([point(0, 2), point(1, 2)]), deck[0].color)
+          .floor
+        ).to.deep.equal([2, 2, 3]))
+      it('lock updates vertical floor', () =>
+        expect(
+          board
+            .lock(path([point(0, 2), point(0, 1)]), black).floor
+        ).to.deep.equal([1, 3, 3]))
     })
   })
-
-//   describe('lock', () => {
-//     it('cannot lock rows outside of dims', () =>
-//       expect(empty(1, 1)
-//         .add(path([point(1, 1)]))
-//         .lock()).to.deep.equal(
-//         Board.empty(1,1).lock()
-//       )
-//     )
-//     it('locks the active path', () => {
-//       expect(Board.empty(1, 1).lock()).to.be.ok
-//     })
-//   })
 
 //   describe('clear', () => {
 //     const board = Board.empty(4, 3, deck[0])
