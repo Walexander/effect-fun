@@ -7,7 +7,7 @@ import { pipe } from '@effect/data/Function'
 
 export class TetronomiElement extends HTMLElement {
   connectedCallback() {
-    IO.runFork(
+    IO.runSync(
       pipe(
         IO.all([
           // eslint-disable-next-line

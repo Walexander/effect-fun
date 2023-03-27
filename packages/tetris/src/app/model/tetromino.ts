@@ -115,12 +115,10 @@ export class Tetromino {
 
   get path(): S.Path {
     return S.path(RA.Foldable)(
-    // eslint-disable-next-line
+      // eslint-disable-next-line
       Rotations[this.type]
         .at(this.rotation)!
-        .points.map(({ x, y }) =>
-          S.point(x + this.translation.x, y + this.translation.y)
-        )
+        .points.map(plusPoint(this.translation))
     )
   }
 

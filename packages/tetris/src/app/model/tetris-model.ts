@@ -35,13 +35,24 @@ export class PausedTetrisGame implements TetrisGame {
   drop(): TetrisGame {
     return this
   }
-  move(): TetrisGame { return this }
-  tick(): TetrisGame { return this }
-  toggle(): TetrisGame {
-    return new ActiveTetrisGame(this.score, this.board, this.bullpen, 'Active', this.active)
+  move(): TetrisGame {
+    return this
   }
-  spin(): TetrisGame { return this }
-
+  tick(): TetrisGame {
+    return this
+  }
+  toggle(): TetrisGame {
+    return new ActiveTetrisGame(
+      this.score,
+      this.board,
+      this.bullpen,
+      'Active',
+      this.active
+    )
+  }
+  spin(): TetrisGame {
+    return this
+  }
 }
 export class ActiveTetrisGame implements TetrisGame {
   constructor(
@@ -124,24 +135,26 @@ export class ActiveTetrisGame implements TetrisGame {
     // wall kick
     if (next.path.points.some(_ => _.x < 0)) next = next.translate(point(1, 0))
     else if (next.path.points.some(_ => _.x >= this.board.dimensions.width))
-    next = next.translate(point(-1, 0))
+      next = next.translate(point(-1, 0))
     // floor kick
     if (next.path.points.some(_ => _.y >= this.board.dimensions.height))
-    next = next.translate(point(0,
-      next.path.points.reduce(
-        (pMax, p) => (p.y >= pMax ? p.y : pMax),
-        0
-      ) - this.board.dimensions.height - 1
-    ))
+      next = next.translate(
+        point(
+          0,
+          next.path.points.reduce((pMax, p) => (p.y >= pMax ? p.y : pMax), 0) -
+            this.board.dimensions.height -
+            1
+        )
+      )
 
     return this.board.isLegal(next.path)
       ? new ActiveTetrisGame(
-        this.score,
-        this.board,
-        this.bullpen,
-        this.status,
-        next
-      )
+          this.score,
+          this.board,
+          this.bullpen,
+          this.status,
+          next
+        )
       : this
   }
 }

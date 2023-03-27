@@ -4,11 +4,11 @@ import * as N from '@effect/data/Number'
 import * as O from '@effect/data/Option'
 import * as Tuple from '@effect/data/Tuple'
 import { Color, black } from 'graphics-ts/Color'
-import { flow, identity, pipe, constant  } from '@effect/data/Function'
+import { flow, identity, pipe, constant } from '@effect/data/Function'
 export interface GameGrid {
   clear: () => readonly [number, GameGrid]
   readonly dimensions: { width: number; height: number }
-  filled: <P extends { x: number; y: number }>(p: P) => Color|false
+  filled: <P extends { x: number; y: number }>(p: P) => Color | false
   readonly floor: number[]
   isLegal: (path: Path) => boolean
   lock(next: Path, color: Color): GameGrid
@@ -18,15 +18,18 @@ export interface GameGrid {
 class BoardData implements GameGrid {
   constructor(
     readonly dims: { width: number; height: number },
-    readonly grid: (Color|false)[][],
+    readonly grid: (Color | false)[][]
   ) {}
 
   clear(): [number, GameGrid] {
     const grid = RA.filter(this.grid, this.isClear.bind(this))
     const score = this.grid.length - grid.length
-    const emptyRows: Array<Color|false>[] =
+    const emptyRows: Array<Color | false>[] =
       score > 0
-        ? RA.makeBy(score, constant(RA.makeBy(this.dims.width, constant(false))))
+        ? RA.makeBy(
+            score,
+            constant(RA.makeBy(this.dims.width, constant(false)))
+          )
         : RA.empty()
     return Tuple.tuple<[number, GameGrid]>(
       score,
@@ -34,7 +37,7 @@ class BoardData implements GameGrid {
     )
   }
 
-  isClear(row: (Color|false)[], rowIndex: number) {
+  isClear(row: (Color | false)[], rowIndex: number) {
     return rowIndex == this.dims.height || row.some(locked => !locked)
   }
 
@@ -45,9 +48,12 @@ class BoardData implements GameGrid {
   }
 
   filled(point: Point) {
-    return point.y < this.grid.length &&
+    return (
+      point.y < this.grid.length &&
       point.x < this.dimensions.width &&
-      point.y >= 0 && this.grid[point.y][point.x]
+      point.y >= 0 &&
+      this.grid[point.y][point.x]
+    )
   }
 
   get floor() {
@@ -61,8 +67,8 @@ class BoardData implements GameGrid {
   }
 
   isLegal(path: Path) {
-    return path.points.every(({x, y}) =>
-      !this.grid[y]?.[x] && x >= 0 && x < this.dimensions.width
+    return path.points.every(
+      ({ x, y }) => !this.grid[y]?.[x] && x >= 0 && x < this.dimensions.width
     )
   }
 
@@ -88,11 +94,11 @@ export function empty(width: number, height: number): GameGrid {
 export function transpose<A>(array: A[][]) {
   return pipe(
     RA.range(0, array[0].length - 1),
-    RA.map(column => array.map((a) => a[column])),
+    RA.map(column => array.map(a => a[column]))
   )
 }
 
-function makeGrid(width: number, height: number): (Color|false)[][] {
+function makeGrid(width: number, height: number): (Color | false)[][] {
   return new Array(height)
     .fill(new Array(width).fill(false))
     .map(_ => _.slice(0))

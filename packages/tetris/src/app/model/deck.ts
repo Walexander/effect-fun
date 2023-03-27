@@ -6,8 +6,10 @@ import * as Str from '@effect/data/String'
 import * as MQ from '@effect/data/MutableQueue'
 import * as Tuple from '@effect/data/Tuple'
 import { Tetromino, TetrominoTags, zero } from './tetromino'
-import {flow, pipe} from '@effect/data/Function'
-const tetrominoOrder = Ord.contramap((tetromino: Tetromino) => tetromino.type)(Str.Order)
+import { flow, pipe } from '@effect/data/Function'
+const tetrominoOrder = Ord.contramap((tetromino: Tetromino) => tetromino.type)(
+  Str.Order
+)
 const order = Tuple.getOrder(Eq.Order, tetrominoOrder)
 export interface Deck {
   next: () => Tetromino
@@ -19,6 +21,7 @@ export class DeckImpl implements Deck {
   constructor() {
     this.preview = MQ.unbounded<Tetromino>()
   }
+
   refill(): Deck {
     void MQ.offerAll(this.preview, IO.runSync(shuffledDeck()))
     return this
@@ -26,8 +29,7 @@ export class DeckImpl implements Deck {
 
   next(): Tetromino {
     const size = MQ.length(this.preview)
-    if(size <= 0 )
-      this.refill()
+    if (size <= 1) this.refill()
     return MQ.poll(this.preview, zero)
   }
 }
@@ -36,12 +38,12 @@ export function make(): Deck {
 }
 export function shuffledDeck() {
   return pipe(
-    IO.forEach(RA.range(0, TetrominoTags.length - 1), () => IO.randomWith(_ => _.next())),
-    IO.map(flow(
-      RA.zip(Tetromino.deck()),
-      RA.sort(order),
-      RA.map(Tuple.getSecond),
-    )),
+    IO.forEach(RA.range(0, TetrominoTags.length - 1), () =>
+      IO.randomWith(_ => _.next())
+    ),
+    IO.map(
+      flow(RA.zip(Tetromino.deck()), RA.sort(order), RA.map(Tuple.getSecond))
+    )
   )
 }
 export const shuffle = () => IO.runSync(shuffledDeck())
