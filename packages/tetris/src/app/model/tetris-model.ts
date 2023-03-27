@@ -20,7 +20,32 @@ export interface TetrisGame extends TetrisModel<GameGrid<Tetromino>> {
   drop(): TetrisGame
   move(direction: 'L'|'R'): TetrisGame
   tick(): TetrisGame
-  spin(direction: 'L'|'R'): TetrisGame
+  toggle(): TetrisGame
+  spin(direction: 'L' | 'R'): TetrisGame
+}
+export class PausedTetrisGame implements TetrisGame {
+  constructor(
+    readonly score: number,
+    readonly board: GameGrid,
+    readonly bullpen = Deck.make(),
+    readonly active: Tetromino
+  ) {}
+  get status(): 'Paused' {
+    return 'Paused'
+  }
+  get isOver() {
+    return false
+  }
+  drop(): TetrisGame {
+    return this
+  }
+  move(): TetrisGame { return this }
+  tick(): TetrisGame { return this }
+  toggle(): TetrisGame {
+    return new ActiveTetrisGame(this.score, this.board, this.bullpen, 'Active', this.active)
+  }
+  spin(): TetrisGame { return this }
+
 }
 export class TetrisModelImpl implements TetrisGame {
   constructor(readonly score: number,
@@ -80,6 +105,15 @@ export class TetrisModelImpl implements TetrisGame {
       ),
       this.bullpen,
       this.status
+    )
+  }
+
+  toggle() {
+    return new PausedTetrisGame(
+      this.score,
+      this.board,
+      this.bullpen,
+      this.active
     )
   }
 }

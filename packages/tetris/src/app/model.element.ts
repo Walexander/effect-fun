@@ -1,16 +1,9 @@
-import * as Board from './model/board'
-
-import * as RA from '@effect/data/ReadonlyArray'
 import { customElement, state } from 'lit/decorators.js'
-import {classMap} from 'lit/directives/class-map.js'
+import { classMap } from 'lit/directives/class-map.js'
 import { html, css, LitElement } from 'lit'
-import { point, path as path$ } from 'graphics-ts/Shape'
-import { Tetromino } from './model/tetromino'
 import * as Deck from './model/deck'
-import './deck.element'
-import {pipe} from '@effect/data/Function'
 import * as TM from './model/tetris-model'
-const path = path$(RA.Foldable)
+import './deck.element'
 import './board.element'
 
 @customElement('tetris-model')
@@ -28,6 +21,15 @@ export class TetrisModelElement extends LitElement {
       --over: '';
       --over-text: 'Game Over!';
   }
+  main.paused {
+      --over: '';
+      --over-text: 'Paused';
+      --bg: hsla(0deg 100% 0% / 0.5);
+  }
+  .deck {
+    flex-basis: 200px;
+  }
+  .board { position: relative; }
   .board::before {
     content: var(--over, unset);
     position: absolute;
@@ -35,8 +37,9 @@ export class TetrisModelElement extends LitElement {
     right: 0;
     bottom: 0;
     top: 0;
-    background: hsla(180deg 50% 50% /0.9);
+    background: var(--bg, hsla(180deg 50% 50% /0.9));
     backdrop-filter: blur(4px);
+    z-index: 1;
   }
   .board::after {
     content: var(--over-text, unset);
@@ -46,17 +49,8 @@ export class TetrisModelElement extends LitElement {
     transform: translate(-50%, -50%);
     color: red;
     font-size: 2rem;
+    z-index: 1;
   }
-    .board {
-      position: relative;
-      flex-basis: 90%;
-      display: grid;
-      align-items: center;
-      justify-content: center;
-      grid-template-columns: repeat(var(--col-count, 10), var(--size, 1fr));
-      grid-template-rows: repeat(var(--row-count, 16), var(--size, 1fr));
-      margin: auto;
-    }
 `
 
   @state()
@@ -65,11 +59,20 @@ export class TetrisModelElement extends LitElement {
     super.connectedCallback()
     this.game = TM.make(10, 12, Deck.make())
     document.addEventListener('keydown', this.onInput.bind(this))
+    const loop = () => {
+      if(this.game.status == 'Active')
+        this.game = this.game.tick()
+      setTimeout(loop, 1e3)
+    }
+    setTimeout(() => loop(), 1e3)
   }
+
   onInput(e: KeyboardEvent) {
     switch(e.code) {
       case 'Space':
-        this.game = this.game.tick()
+        this.game = this.game.isOver
+          ? TM.make(10, 12, Deck.make())
+          : this.game.tick()
         return e.preventDefault()
       case 'ArrowRight':
       case 'ArrowLeft':
@@ -78,6 +81,9 @@ export class TetrisModelElement extends LitElement {
       case 'ArrowUp':
       case 'ArrowDown':
         this.game = this.game.spin(e.code == 'ArrowUp' ? 'L' : 'R')
+        return e.preventDefault()
+      case 'KeyP':
+        this.game = this.game.toggle()
         return e.preventDefault()
       default:
         return void null
@@ -88,14 +94,17 @@ export class TetrisModelElement extends LitElement {
 
     return html`
       <main class="${classMap({
-        over: false
+        over: this.game.isOver,
+        paused: this.game.status == 'Paused'
       })}">
         <section class="deck">
-          <tetris-deck .deck=${[...this.game.bullpen.preview]}></tetris-deck>
+          <tetris-deck .deck=${this.game.isOver ? [] : [...this.game.bullpen.preview]}></tetris-deck>
         </section>
-        <section><tetris-board .board=${this.game.board} width=10 height=12></tetris-board></section>
+        <section class=board>
+          <tetris-board .active=${this.game.active} .board=${this.game.board} width=10 height=12></tetris-board>
+        </section>
         <section class=scoreboard>
-              <h2>Score ${this.game.score * 1000}</h2>
+          <h2>Score<br/>${this.game.score * 1000}</h2>
         </section>
       </main>
 `
