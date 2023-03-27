@@ -59,13 +59,13 @@ const Shapes: Record<ShapeTag, S.Path> = {
 }
 
 const Colors: Record<ShapeTag, Color.Color> = {
-  s: Color.hsla(120, 1, 0.5, 1),
-  z: Color.hsla(0, 1, 0.5, 1),
-  i: Color.hsla(180, 1, 0.5, 1),
-  o: Color.hsla(60, 0.75, 0.5, 1),
-  l: Color.hsla(39, 1, 0.5, 1),
-  j: Color.hsla(240, 1, 0.5, 1),
-  t: Color.hsla(276, 1, 0.5, 1),
+  s: Color.hsla(120, 0.5, 0.5, 1),
+  z: Color.hsla(0, 0.5, 0.5, 1),
+  i: Color.hsla(180, 0.5, 0.5, 1),
+  o: Color.hsla(60, 0.5, 0.5, 1),
+  l: Color.hsla(39, 0.5, 0.5, 1),
+  j: Color.hsla(240, 0.5, 0.5, 1),
+  t: Color.hsla(276, 0.5, 0.5, 1),
 }
 
 function rotateAround(path: S.Path): [S.Path, S.Path, S.Path, S.Path] {
