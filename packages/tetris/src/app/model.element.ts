@@ -16,6 +16,7 @@ export class TetrisModelElement extends LitElement {
       justify-content: space-between;
       align-items: center;
       min-height: 90vh;
+      max-height: 95vh;
     }
     main.over {
       --over: '';
@@ -39,7 +40,7 @@ export class TetrisModelElement extends LitElement {
       right: 0;
       bottom: 0;
       top: 0;
-      background: var(--bg, hsla(180deg 50% 50% /0.9));
+      background: var(--bg, hsla(0deg 0% 50% /0.7));
       backdrop-filter: blur(4px);
       z-index: 1;
     }
@@ -59,8 +60,10 @@ export class TetrisModelElement extends LitElement {
   declare game: TM.TetrisGame
   connectedCallback() {
     super.connectedCallback()
-    this.game = TM.make(10, 12, Deck.make())
+    this.game = TM.make(10, 20, Deck.make())
     document.addEventListener('keydown', this.onInput.bind(this))
+    const height = window.innerHeight * 0.8
+    this.style.setProperty('--size', (height / 20) + 'px')
     const loop = () => {
       if (this.game.status == 'Active') this.game = this.game.tick()
       setTimeout(loop, 1e3)
@@ -72,7 +75,7 @@ export class TetrisModelElement extends LitElement {
     switch (e.code) {
       case 'Space':
         this.game = this.game.isOver
-          ? TM.make(10, 12, Deck.make())
+          ? TM.make(10, 20, Deck.make())
           : this.game.tick()
         return e.preventDefault()
       case 'ArrowRight':
@@ -108,6 +111,7 @@ export class TetrisModelElement extends LitElement {
           <tetris-board
             .active=${this.game.active}
             .board=${this.game.board}
+            .projected=${this.game.active.translate(this.game.board.project(this.game.active.path))}
             width="10"
             height="12"
           ></tetris-board>

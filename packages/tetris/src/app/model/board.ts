@@ -1,17 +1,42 @@
 import type { Path, Point } from 'graphics-ts/Shape'
+import { point, path as path$ } from 'graphics-ts/Shape'
 import * as RA from '@effect/data/ReadonlyArray'
 import * as N from '@effect/data/Number'
 import * as O from '@effect/data/Option'
 import * as Tuple from '@effect/data/Tuple'
 import { Color, black } from 'graphics-ts/Color'
 import { flow, identity, pipe, constant } from '@effect/data/Function'
+const $path = path$(RA.Foldable)
+
 export interface GameGrid {
+  /**
+   * find and remove all continuous rows
+  */
   clear: () => readonly [number, GameGrid]
   readonly dimensions: { width: number; height: number }
+  /**
+   * check the status of a point on the grid
+  */
   filled: <P extends { x: number; y: number }>(p: P) => Color | false
+  /**
+   * The first filled row as a list of columns
+  */
   readonly floor: number[]
+  /**
+   * Check if a path can be placed into the grid
+  */
   isLegal: (path: Path) => boolean
+  /**
+   * Lock the `next` path using `color`
+  */
   lock(next: Path, color: Color): GameGrid
+  /**
+   * project a `path` onto the grid's floor
+  */
+  project(path: Path): Point
+  /**
+   * test if any points in `path` rest on a filled space
+  */
   touches: (path: Path) => boolean
 }
 
@@ -84,6 +109,16 @@ class BoardData implements GameGrid {
       )
     )
     return new BoardData(this.dims, grid)
+  }
+
+  project(_: Path) {
+    const maxY = _.points.reduce((max: number, cur) => {
+      return cur.y > max ? cur.y : max
+    }, -Infinity)
+    const touches = RA.range(0, this.dimensions.height - maxY).find((step) =>
+        this.touches($path(_.points.map(_ => point(_.x, step + _.y))))
+    ) || this.dimensions.height - 1
+    return point(0, N.clamp(0, this.dimensions.height - 1)(touches - 1))
   }
 }
 

@@ -101,4 +101,15 @@ describe('Board', () => {
         ]).to.deep.equal([false, false, false]))
     })
   })
+
+  describe('project', () => {
+    it('projects onto its drop  point', () => {
+      const board = Board.empty(2, 2)
+      expect(board.project(path([point(0, 0)]))).to.deep.equal(
+        path([point(0, 1)])
+      )
+    })
+
+
+  })
 })
