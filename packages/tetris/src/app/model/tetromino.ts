@@ -1,6 +1,7 @@
 import * as S from 'graphics-ts/Shape'
 import * as Color from 'graphics-ts/Color'
 import * as RA from '@effect/data/ReadonlyArray'
+import { translate, plusPoint } from '../../path-utils'
 export type ShapeTag = 's' | 'z' | 'i' | 'o'| 'l' | 'j' | 't'
 export const TetrominoTags: ShapeTag[] = [ 's' , 'z' , 'i' , 'o', 'l' , 'j' , 't' ]
 export enum Tetrominos {
@@ -95,12 +96,6 @@ const Rotations: Record<ShapeTag, [S.Path, S.Path, S.Path, S.Path]> = {
   j: rotateAround(Shapes.j),
   t: rotateAround(Shapes.t),
 }
-const plusPoint = (p1: S.Point) => (p2: S.Point) => S.point(p1.x + p2.x, p1.y + p2.y)
-
-// const Bounds: Record<ShapeTag, S.Rect> = {
-//   s: S.rect(0, 0, 3, 3),
-//   z: S.rect(0, 0, 3, 3),
-// }
 export class Tetromino {
   static deck = tetrominoDeck
   static tags = TetrominoTags
@@ -114,12 +109,9 @@ export class Tetromino {
   }
 
   get path(): S.Path {
-    return S.path(RA.Foldable)(
       // eslint-disable-next-line
-      Rotations[this.type]
-        .at(this.rotation)!
-        .points.map(plusPoint(this.translation))
-    )
+    const path_ = Rotations[this.type].at(this.rotation)!
+    return translate(path_)(this.translation)
   }
 
   get center() {
