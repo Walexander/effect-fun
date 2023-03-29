@@ -29,7 +29,7 @@ export class DeckImpl implements Deck {
 
   next(): Tetromino {
     const size = MQ.length(this.preview)
-    if (size <= 1) this.refill()
+    if (size < 7) this.refill()
     return MQ.poll(this.preview, zero)
   }
 }

@@ -27,8 +27,8 @@ export class DeckElement extends LitElement {
 
   render() {
     const deck = repeat(
-      this.deck,
-      _ => _.type,
+      this.deck.slice(0, 5),
+      (_, idx) => _.type + idx.toFixed(0),
       _ =>
         html`<effect-fun-tetromino
           id=${_.type}
