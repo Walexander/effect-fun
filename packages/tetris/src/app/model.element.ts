@@ -13,10 +13,13 @@ export class TetrisModelElement extends LitElement {
       position: relative;
       display: flex;
       flex-direction: row;
-      justify-content: space-between;
+      justify-content: center;
+      column-gap: 1rem;
       align-items: center;
       min-height: 90vh;
       max-height: 95vh;
+      background: #111111;
+      color: white;
     }
     main.over {
       --over: '';
@@ -32,6 +35,7 @@ export class TetrisModelElement extends LitElement {
     }
     .board {
       position: relative;
+      border: 4px solid white;
     }
     .board::before {
       content: var(--over, unset);

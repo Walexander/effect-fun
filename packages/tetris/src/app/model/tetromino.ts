@@ -1,7 +1,7 @@
 import * as S from 'graphics-ts/Shape'
 import * as Color from 'graphics-ts/Color'
 import * as RA from '@effect/data/ReadonlyArray'
-import { translate, plusPoint } from '../../path-utils'
+import { path, translate, plusPoint } from '../../path-utils'
 export type ShapeTag = 's' | 'z' | 'i' | 'o'| 'l' | 'j' | 't'
 export const TetrominoTags: ShapeTag[] = [ 's' , 'z' , 'i' , 'o', 'l' , 'j' , 't' ]
 export enum Tetrominos {
@@ -15,43 +15,43 @@ export enum Tetrominos {
 }
 
 const Shapes: Record<ShapeTag, S.Path> = {
-  s: S.path(RA.Foldable)([
+  s: path([
     S.point(-1, 0),
     S.point(0, 0),
     S.point(0, -1),
     S.point(1, -1),
   ]),
-  z: S.path(RA.Foldable)([
+  z: path([
     S.point(-1, -1),
     S.point(0, -1),
     S.point(0, 0),
     S.point(1, 0),
   ]),
-  i: S.path(RA.Foldable)([
+  i: path([
     S.point(-1, 0),
     S.point(0, 0),
     S.point(1, 0),
     S.point(2, 0),
   ]),
-  o: S.path(RA.Foldable)([
+  o: path([
     S.point(-1, -1),
     S.point(-1, 0),
     S.point(0, 0),
     S.point(0, -1),
   ]),
-  l: S.path(RA.Foldable)([
+  l: path([
     S.point(-1, 0),
     S.point(0, 0),
     S.point(1, 0),
     S.point(1, -1)
   ]),
-  j: S.path(RA.Foldable)([
+  j: path([
     S.point(-1, -1),
     S.point(-1, 0),
     S.point(0, 0),
     S.point(1, 0),
   ]),
-  t: S.path(RA.Foldable)([
+  t: path([
     S.point(-1, 0),
     S.point(0, 0),
     S.point(0, -1),
@@ -69,24 +69,6 @@ const Colors: Record<ShapeTag, Color.Color> = {
   t: Color.hsla(276, 0.5, 0.5, 1),
 }
 
-function rotateAround(path: S.Path): [S.Path, S.Path, S.Path, S.Path] {
-  const once = rotateClockwise(path)
-  const twice = rotateClockwise(once)
-  const thrice = rotateClockwise(twice)
-  return [
-    path,
-    once,
-    twice,
-    thrice
-  ]
-}
-
-export function rotateClockwise(path: S.Path): S.Path {
-  return S.path(RA.Foldable)(
-    path.points.map(
-      (point) => S.point(-point.y, point.x))
-  )
-}
 const Rotations: Record<ShapeTag, [S.Path, S.Path, S.Path, S.Path]> = {
   s: rotateAround(Shapes.s),
   z: rotateAround(Shapes.z),
@@ -99,19 +81,21 @@ const Rotations: Record<ShapeTag, [S.Path, S.Path, S.Path, S.Path]> = {
 export class Tetromino {
   static deck = tetrominoDeck
   static tags = TetrominoTags
-  readonly color: Color.Color
   constructor(
     readonly type: ShapeTag,
     readonly rotation = 0,
     readonly translation = S.point(0, 0)
   ) {
-    this.color = Colors[this.type]
   }
 
   get path(): S.Path {
       // eslint-disable-next-line
     const path_ = Rotations[this.type].at(this.rotation)!
     return translate(path_)(this.translation)
+  }
+
+  get color() {
+    return Colors[this.type]
   }
 
   get center() {
@@ -131,7 +115,24 @@ export class Tetromino {
   }
 }
 export const zero = new Tetromino(Tetrominos.I)
-
 export function tetrominoDeck() {
   return TetrominoTags.map(_ => new Tetromino(_, 0))
+}
+function rotateAround(path: S.Path): [S.Path, S.Path, S.Path, S.Path] {
+  const once = rotateClockwise(path)
+  const twice = rotateClockwise(once)
+  const thrice = rotateClockwise(twice)
+  return [
+    path,
+    once,
+    twice,
+    thrice
+  ]
+}
+
+export function rotateClockwise(path: S.Path): S.Path {
+  return S.path(RA.Foldable)(
+    path.points.map(
+      (point) => S.point(-point.y, point.x))
+  )
 }
