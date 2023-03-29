@@ -1,12 +1,12 @@
 import type { Path, Point } from 'graphics-ts/Shape'
-import { point, path as path$ } from 'graphics-ts/Shape'
+import { point } from 'graphics-ts/Shape'
+import { translate } from '../../path-utils'
 import * as RA from '@effect/data/ReadonlyArray'
 import * as N from '@effect/data/Number'
 import * as O from '@effect/data/Option'
 import * as Tuple from '@effect/data/Tuple'
 import { Color, black } from 'graphics-ts/Color'
 import { flow, identity, pipe, constant } from '@effect/data/Function'
-const $path = path$(RA.Foldable)
 
 export interface GameGrid {
   /**
@@ -111,14 +111,21 @@ class BoardData implements GameGrid {
     return new BoardData(this.dims, grid)
   }
 
-  project(_: Path) {
-    const maxY = _.points.reduce((max: number, cur) => {
-      return cur.y > max ? cur.y : max
-    }, -Infinity)
-    const touches = RA.range(0, this.dimensions.height - maxY).find((step) =>
-        this.touches($path(_.points.map(_ => point(_.x, step + _.y))))
-    ) || this.dimensions.height - 1
-    return point(0, N.clamp(0, this.dimensions.height - 1)(touches - 1))
+  // Find a translation `Point` for a `Path`
+  // corresponding with where it will land
+  project(path: Path) {
+    // translate function on the path
+    const xlate: (p: Point) => Path = translate(path)
+    // the "lowest" column of our path
+    const maxRow = Math.max(...path.points.map(_ => _.y))
+
+    // iterate over rows below our path and
+    // and find the first one we touch
+    const projectedRow = RA.range(1, this.dimensions.height - maxRow).find(
+      rowStep => this.touches(xlate(point(0, rowStep)))
+    )
+    // our projection is one "above" the row we touch
+    return point(0, (projectedRow??0) - 1)
   }
 }
 

@@ -5,7 +5,6 @@ import { html, css, LitElement } from 'lit'
 import { Tetromino } from './model/tetromino'
 import * as Color from 'graphics-ts/Color'
 import { point, Point } from 'graphics-ts/Shape'
-import { pipe } from '@effect/data/Function'
 
 import * as Board from './model/board'
 
@@ -48,14 +47,19 @@ export class TetrisBoardElement extends LitElement {
       box-shadow: inset 0px 0px 1px 3px hsla(0 0% 50% / 0.75);
       background: var(--bg);
     }
+    .last .block {
+      box-shadow: none;
+      background: transparent;
+display: none;
+    }
 
     .projected .block {
       opacity: 0.25;
     }
     .last {
-      background: grey;
+      background: #000;
       --fg: transparent;
-      aspect-ratio: 2/1;
+      --border-color: transparent;
     }
   `
   @property({ attribute: false })

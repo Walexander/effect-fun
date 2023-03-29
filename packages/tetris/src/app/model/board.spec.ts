@@ -103,13 +103,16 @@ describe('Board', () => {
   })
 
   describe('project', () => {
-    it('projects onto its drop  point', () => {
-      const board = Board.empty(2, 2)
+    it('empty board projects onto last row', () => {
+      const board = Board.empty(2, 3)
       expect(board.project(path([point(0, 0)]))).to.deep.equal(
-        path([point(0, 1)])
+        point(0, 2)
       )
     })
-
-
+    it('projects onto the first filled column', () => {
+      const board = Board.empty(2, 3).lock(path([point(0, 2)]), white)
+      expect(board.project(path([point(0, 0)])))
+        .to.deep.equal(point(0, 1))
+    })
   })
 })
