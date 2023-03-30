@@ -26,11 +26,40 @@ export class PausedTetrisGame implements TetrisGame {
     readonly bullpen = Deck.make(),
     readonly active: Tetromino
   ) {}
-  get status(): 'Paused' {
+  get status(): TetrisGame['status'] {
     return 'Paused'
   }
   get isOver() {
     return false
+  }
+  drop(): TetrisGame {
+    return this
+  }
+  move(): TetrisGame {
+    return this
+  }
+  tick(): TetrisGame {
+    return this
+  }
+  toggle(): TetrisGame {
+    return new ActiveTetrisGame(
+      this.score,
+      this.board,
+      this.bullpen,
+      'Active',
+      this.active
+    )
+  }
+  spin(): TetrisGame {
+    return this
+  }
+}
+export class OverTetrisGame extends PausedTetrisGame {
+  get status(): TetrisGame['status'] {
+    return 'Over'
+  }
+  get isOver() {
+    return true
   }
   drop(): TetrisGame {
     return this
@@ -73,8 +102,8 @@ export class ActiveTetrisGame implements TetrisGame {
       this.board,
       this.bullpen,
       this.status,
-      this.active.translate(point(0, 1))
-    )
+      this.active.translate(this.board.project(this.active.path)),
+    ).tick()
   }
 
   move(direction: 'L' | 'R'): TetrisGame {
@@ -111,13 +140,15 @@ export class ActiveTetrisGame implements TetrisGame {
       .lock(this.active.path, this.active.color)
       .clear()
 
-    return new ActiveTetrisGame(
-      score + this.score,
-      board,
-      this.bullpen,
-      this.active.path.points.some(({ y }) => y <= 0) ? 'Over' : this.status,
-      next_
-    )
+    return this.active.path.points.some(({ y }) => y <= 0)
+      ? new OverTetrisGame(this.score + this.score, board, this.bullpen, next_)
+      : new ActiveTetrisGame(
+          score + this.score,
+          board,
+          this.bullpen,
+          'Active',
+          next_
+        )
   }
 
   toggle() {

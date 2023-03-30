@@ -50,7 +50,6 @@ export class TetrisBoardElement extends LitElement {
     .last .block {
       box-shadow: none;
       background: transparent;
-display: none;
     }
 
     .projected .block {

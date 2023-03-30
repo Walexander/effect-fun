@@ -1,4 +1,4 @@
-import { customElement, state } from 'lit/decorators.js'
+import { customElement, property, state } from 'lit/decorators.js'
 import { classMap } from 'lit/directives/class-map.js'
 import { html, css, LitElement } from 'lit'
 import * as Deck from './model/deck'
@@ -60,44 +60,14 @@ export class TetrisModelElement extends LitElement {
     }
   `
 
-  @state()
+  @property({attribute: false})
   declare game: TM.TetrisGame
   connectedCallback() {
     super.connectedCallback()
-    this.game = TM.make(10, 20, Deck.make())
-    document.addEventListener('keydown', this.onInput.bind(this))
+    this.game = TM.make(10, 12, Deck.make())
     const height = window.innerHeight * 0.8
     this.style.setProperty('--size', (height / 20) + 'px')
-    const loop = () => {
-      if (this.game.status == 'Active') this.game = this.game.tick()
-      setTimeout(loop, 1e3)
-    }
-    setTimeout(() => loop(), 1e3)
   }
-
-  onInput(e: KeyboardEvent) {
-    switch (e.code) {
-      case 'Space':
-        this.game = this.game.isOver
-          ? TM.make(10, 20, Deck.make())
-          : this.game.tick()
-        return e.preventDefault()
-      case 'ArrowRight':
-      case 'ArrowLeft':
-        this.game = this.game.move(e.code == 'ArrowRight' ? 'R' : 'L')
-        return e.preventDefault()
-      case 'ArrowUp':
-      case 'ArrowDown':
-        this.game = this.game.spin(e.code == 'ArrowUp' ? 'L' : 'R')
-        return e.preventDefault()
-      case 'KeyP':
-        this.game = this.game.toggle()
-        return e.preventDefault()
-      default:
-        return void null
-    }
-  }
-
   render() {
     return html`
       <main
