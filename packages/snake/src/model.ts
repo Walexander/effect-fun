@@ -54,18 +54,17 @@ function eventReducer(
       return onKeyDown(e, state)
 
     case 'eats':
-      return IO.map(
-        makeApple(-10, 10),
-        apple => ({
-          ...state,
-          // state.snake is nonempty, so `.at(-1)` is safe
-          // eslint-disable-next-line
-          snake: [...state.snake, state.snake.at(-1)!],
-          apple,
-          updateRate: state.updateRate > 6 && state.snake.length % 5 == 0 ? state.updateRate / 2 : state.updateRate
-        })
-      )
-
+      return IO.map(makeApple(-10, 10), apple => ({
+        ...state,
+        // state.snake is nonempty, so `.at(-1)` is safe
+        // eslint-disable-next-line
+        snake: [...state.snake, state.snake.at(-1)!],
+        apple,
+        updateRate:
+          state.updateRate > 8 && state.snake.length % 6 == 0
+            ? state.updateRate / 2
+            : state.updateRate,
+      }))
     default:
       return IO.succeed(state)
   }
