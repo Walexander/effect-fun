@@ -3,7 +3,7 @@ import { rect, point } from 'graphics-ts/Shape'
 import { Engine } from './engine'
 import * as C from 'graphics-ts/Canvas'
 import { NonEmptyArray } from '@effect/data/ReadonlyArray'
-import { gridBackground } from './draw-game'
+import { gridBackground } from './background'
 import { Model, makeApple, GameEvent } from './model'
 
 export function initialize(
