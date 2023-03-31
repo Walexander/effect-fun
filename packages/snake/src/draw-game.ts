@@ -4,9 +4,7 @@ import { Model } from './model'
 import * as C from 'graphics-ts/Canvas'
 
 export function drawGame(state: Model) {
-  return state.ticks % 4 == 0
-    ? IO.unit()
-    : IO.collectAllDiscard([
+  return IO.collectAllDiscard([
       C.putImageData(state.background, 0, 0),
       C.withContext(pipe(
         C.translate(state.dims[0] / 2, state.dims[1] / 2),
@@ -29,9 +27,8 @@ function drawSnake({
   velocity: [dx, dy],
   scale,
   headPosition,
-  updateRate,
 }: Model) {
-  const [head, ...tail] = snake
+  const [,...tail] = snake
   const drawTail = C.withContext(
     IO.collectAllDiscard([
       C.setFillStyle(`green`),
@@ -45,33 +42,22 @@ function drawSnake({
   )
   const drawHead = C.withContext(
     IO.collectAllDiscard([
+      C.setFillStyle('black'),
+      C.fillPath(drawSegment(headPosition.x, headPosition.y, scale, false)),
+      C.rotate(Math.atan2(dy, dx)),
+      C.setStrokeStyle(`orange`),
       C.withContext(
-        IO.collectAllDiscard([
-          C.setFillStyle('transparent'),
-          C.fillPath(
-            updateRate <= 6
-              ? drawSegment(...head, scale, true)
-              : drawSegment(headPosition.x, headPosition.y, scale, false)
-          ),
-          //
-          C.rotate(Math.atan2(dy, dx)),
-          C.setFillStyle(`black`),
-          C.withContext(
-            C.fillPath(
-              IO.collectAllDiscard([
-                C.rect(-scale / 2, -scale / 2, scale / 2, scale),
-                C.rotate((22 * Math.PI) / 180),
-                C.arc(0, 0, scale / 2, 0, Math.PI * 2),
-                C.lineTo(0, 0),
-                C.closePath,
-              ])
-            )
-          ),
-        ])
+        C.strokePath(
+          IO.collectAllDiscard([
+            C.arc(0, 0, scale / 2, 0, Math.PI * 2),
+            C.lineTo(0, 0),
+            C.closePath,
+          ])
+        )
       ),
     ])
   )
-  return C.withContext(IO.zipRight(drawTail, drawHead))
+  return IO.zipRight(drawTail, drawHead)
 }
 function drawApple({ apple: [x, y], scale }: Model) {
   return C.withContext(
