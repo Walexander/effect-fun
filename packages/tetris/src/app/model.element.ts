@@ -1,8 +1,8 @@
-import { customElement, property, state } from 'lit/decorators.js'
+import { customElement, property } from 'lit/decorators.js'
 import { classMap } from 'lit/directives/class-map.js'
 import { html, css, LitElement } from 'lit'
-import * as Deck from './model/deck'
-import * as TM from './model/tetris-model'
+import * as Deck from '../model/deck'
+import * as TM from '../model/tetris-model'
 import './deck.element'
 import './board.element'
 

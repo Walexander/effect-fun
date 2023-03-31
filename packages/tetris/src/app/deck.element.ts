@@ -1,9 +1,8 @@
 import { customElement, property } from 'lit/decorators.js'
 import { repeat } from 'lit/directives/repeat.js'
 import {css, html, LitElement} from 'lit'
-import {Tetromino} from './model/tetromino'
+import {Tetromino} from '../model/tetromino'
 import './tetromino.element'
-
 
 @customElement('tetris-deck')
 export class DeckElement extends LitElement {

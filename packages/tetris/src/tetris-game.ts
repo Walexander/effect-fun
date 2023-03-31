@@ -2,8 +2,8 @@ import {Chunk} from '@effect/data/Chunk'
 import * as Context from '@effect/data/Context'
 import * as IO from '@effect/io/Effect'
 import * as E from '@effect-fun/engine'
-import * as D from './app/model/deck'
-import { make, TetrisGame } from './app/model/tetris-model'
+import * as D from './model/deck'
+import { make, TetrisGame } from './model/tetris-model'
 import {TetrisModelElement} from './app/model.element'
 
 export const initialize = IO.succeed(make(10, 21, D.make()))

@@ -1,7 +1,7 @@
 import './app.element.css'
 import * as IO from '@effect/io/Effect'
 import { DrawsTetrominosTag, LiveDrawsTetrominos } from './drawables/tetromino'
-import { ShapeTag, Tetromino } from './model/tetromino'
+import { ShapeTag, Tetromino } from '../model/tetromino'
 import * as C from 'graphics-ts/Canvas'
 import { pipe } from '@effect/data/Function'
 
