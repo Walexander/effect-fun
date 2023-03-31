@@ -1,7 +1,7 @@
 import * as S from 'graphics-ts/Shape'
 import * as Color from 'graphics-ts/Color'
 import * as RA from '@effect/data/ReadonlyArray'
-import { path, translate, plusPoint } from '../../path-utils'
+import { path, translate, plusPoint } from '../path-utils'
 export type ShapeTag = 's' | 'z' | 'i' | 'o'| 'l' | 'j' | 't'
 export const TetrominoTags: ShapeTag[] = [ 's' , 'z' , 'i' , 'o', 'l' , 'j' , 't' ]
 export enum Tetrominos {

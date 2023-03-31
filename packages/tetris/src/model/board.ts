@@ -1,6 +1,6 @@
 import type { Path, Point } from 'graphics-ts/Shape'
 import { point } from 'graphics-ts/Shape'
-import { translate } from '../../path-utils'
+import { translate } from '../path-utils'
 import * as RA from '@effect/data/ReadonlyArray'
 import * as N from '@effect/data/Number'
 import * as O from '@effect/data/Option'
