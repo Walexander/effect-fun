@@ -72,7 +72,7 @@ function keyEvent<E>(eventType: 'keyup'|'keydown', queue: Queue.Queue<E>) {
         document.addEventListener(eventType, (ev) => emit(IO.succeed(Chunk.of(ev))))
       )
     ),
-    S.tap(_ => IO.sync(() => _.preventDefault())),
+    // S.tap(_ => IO.sync(() => _.preventDefault())),
     S.map(event => (<E>{
       _tag: eventType,
       code: event.code,
